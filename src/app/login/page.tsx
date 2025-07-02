@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { signIn, signInWithGoogle } from '@/services/auth';
+import { addAuditLog } from '@/services/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
@@ -32,7 +33,8 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signIn(email, password);
+      const loggedInUser = await signIn(email, password);
+      await addAuditLog(loggedInUser.uid, 'User Signed In', 'User signed in with email and password.');
       router.replace('/');
     } catch (error: any) {
       toast({
@@ -48,7 +50,8 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      await signInWithGoogle();
+      const loggedInUser = await signInWithGoogle();
+      await addAuditLog(loggedInUser.uid, 'User Signed In', 'User signed in with Google.');
       router.replace('/');
     } catch (error: any) {
        toast({

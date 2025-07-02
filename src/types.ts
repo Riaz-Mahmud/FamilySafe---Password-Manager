@@ -15,3 +15,10 @@ export interface FamilyMember {
   email: string;
   avatar: string; // URL to avatar image
 }
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  description: string;
+  timestamp: string;
+}

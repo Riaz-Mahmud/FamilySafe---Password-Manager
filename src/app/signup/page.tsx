@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { signUp } from '@/services/auth';
+import { addAuditLog } from '@/services/firestore';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
 
@@ -42,7 +43,8 @@ export default function SignupPage() {
     }
     setIsLoading(true);
     try {
-      await signUp(email, password);
+      const newUser = await signUp(email, password);
+      await addAuditLog(newUser.uid, 'Account Created', 'User created a new account.');
       toast({
         title: 'Success!',
         description: 'Your account has been created. Please log in.',

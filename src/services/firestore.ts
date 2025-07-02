@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember } from '@/types';
+import type { Credential, FamilyMember, AuditLog } from '@/types';
 import {
   collection,
   addDoc,
@@ -17,8 +17,8 @@ import {
 // --- Helpers ---
 
 function formatTimestamp(timestamp: Timestamp | undefined): string {
-  if (!timestamp) return new Date().toLocaleDateString();
-  return new Date(timestamp.seconds * 1000).toLocaleDateString();
+  if (!timestamp) return new Date().toLocaleString();
+  return new Date(timestamp.seconds * 1000).toLocaleString();
 }
 
 
@@ -100,4 +100,43 @@ export async function updateFamilyMember(userId: string, id: string, member: Par
 export async function deleteFamilyMember(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'familyMembers', id);
   await deleteDoc(docRef);
+}
+
+
+// --- Audit Logs ---
+
+export async function addAuditLog(userId: string, action: string, description: string): Promise<void> {
+    const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
+    try {
+        await addDoc(auditLogsCol, {
+            action,
+            description,
+            timestamp: serverTimestamp(),
+        });
+    } catch (error) {
+        console.error("Error adding audit log:", error);
+    }
+}
+
+export function getAuditLogs(userId: string, callback: (logs: AuditLog[]) => void): () => void {
+    const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
+    const q = query(auditLogsCol, orderBy('timestamp', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const logs = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                action: data.action,
+                description: data.description,
+                timestamp: formatTimestamp(data.timestamp),
+            } as AuditLog;
+        });
+        callback(logs);
+    }, (error) => {
+        console.error("Error fetching audit logs:", error);
+        callback([]);
+    });
+
+    return unsubscribe;
 }

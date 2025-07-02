@@ -26,6 +26,7 @@ import {
   LifeBuoy,
   Loader2,
   ShieldCheck,
+  History,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember } from '@/types';
+import type { Credential, FamilyMember, AuditLog } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -57,6 +58,8 @@ import {
   addFamilyMember,
   updateFamilyMember,
   deleteFamilyMember,
+  addAuditLog,
+  getAuditLogs,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -65,6 +68,7 @@ import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
 import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 import { SecurityHealthPage } from '@/components/dashboard/security-health-page';
+import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 
 
 export default function DashboardPage() {
@@ -73,6 +77,7 @@ export default function DashboardPage() {
 
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
@@ -96,40 +101,48 @@ export default function DashboardPage() {
     if (!user?.uid) {
       setCredentials([]);
       setFamilyMembers([]);
+      setAuditLogs([]);
       setIsDataLoading(false);
       return;
     }
 
     setIsDataLoading(true);
     
-    let credsLoaded = false;
-    let membersLoaded = false;
+    let loadedCount = 0;
+    const totalToLoad = 3;
 
     const checkDone = () => {
-      if (credsLoaded && membersLoaded) {
+      loadedCount++;
+      if (loadedCount === totalToLoad) {
         setIsDataLoading(false);
       }
     };
 
     const unsubscribeCredentials = getCredentials(user.uid, (creds) => {
       setCredentials(creds);
-      credsLoaded = true;
       checkDone();
     });
 
     const unsubscribeFamilyMembers = getFamilyMembers(user.uid, (members) => {
       setFamilyMembers(members);
-      membersLoaded = true;
+      checkDone();
+    });
+
+    const unsubscribeAuditLogs = getAuditLogs(user.uid, (logs) => {
+      setAuditLogs(logs);
       checkDone();
     });
 
     return () => {
       unsubscribeCredentials();
       unsubscribeFamilyMembers();
+      unsubscribeAuditLogs();
     };
   }, [user?.uid]);
 
   const handleSignOut = async () => {
+    if(!user) return;
+    await addAuditLog(user.uid, 'User Signed Out', 'User signed out from the application.');
     await signOutUser();
     router.push('/login');
   };
@@ -138,6 +151,7 @@ export default function DashboardPage() {
     if(!user) return;
     try {
       await addCredential(user.uid, newCredential);
+      await addAuditLog(user.uid, 'Create Credential', `Saved credential for ${newCredential.url}.`);
       toast({
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
@@ -153,6 +167,7 @@ export default function DashboardPage() {
     try {
       const { id, ...dataToUpdate } = updatedCredential;
       await updateCredential(user.uid, id, dataToUpdate);
+      await addAuditLog(user.uid, 'Update Credential', `Updated credential for ${updatedCredential.url}.`);
       toast({
         title: 'Credential Updated',
         description: 'The credential has been updated successfully.',
@@ -165,8 +180,12 @@ export default function DashboardPage() {
 
   const handleDeleteCredential = async () => {
     if (deleteTargetId && user) {
+      const credToDelete = credentials.find(c => c.id === deleteTargetId);
       try {
         await deleteCredential(user.uid, deleteTargetId);
+         if (credToDelete) {
+           await addAuditLog(user.uid, 'Delete Credential', `Deleted credential for ${credToDelete.url}.`);
+        }
         toast({
           title: 'Credential Deleted',
           description: 'The credential has been permanently deleted.',
@@ -189,6 +208,7 @@ export default function DashboardPage() {
             avatar: `https://placehold.co/40x40.png`,
         };
         await addFamilyMember(user.uid, memberToAdd);
+        await addAuditLog(user.uid, 'Create Family Member', `Added ${newMember.name} to the family group.`);
         toast({
             title: 'Family Member Added',
             description: `${newMember.name} has been added to your family group.`,
@@ -203,6 +223,7 @@ export default function DashboardPage() {
     if(!user) return;
     try {
         await updateFamilyMember(user.uid, updatedMember.id, updatedMember);
+        await addAuditLog(user.uid, 'Update Family Member', `Updated details for ${updatedMember.name}.`);
         toast({
             title: 'Family Member Updated',
             description: 'The member details have been updated successfully.',
@@ -219,8 +240,12 @@ export default function DashboardPage() {
 
   const handleDeleteFamilyMember = async () => {
     if (deleteFamilyMemberTargetId && user) {
+       const memberToDelete = familyMembers.find(m => m.id === deleteFamilyMemberTargetId);
       try {
           await deleteFamilyMember(user.uid, deleteFamilyMemberTargetId);
+          if (memberToDelete) {
+             await addAuditLog(user.uid, 'Delete Family Member', `Removed ${memberToDelete.name} from the family group.`);
+          }
           toast({
               title: 'Family Member Removed',
               description: 'The family member has been removed.',
@@ -298,6 +323,52 @@ export default function DashboardPage() {
     );
   }
 
+  const renderContent = () => {
+    if (isDataLoading) {
+      return (
+        <div className="space-y-4">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      );
+    }
+  
+    switch (activeMenu) {
+      case 'All Passwords':
+      case 'My Passwords':
+        return (
+          <PasswordList
+            credentials={filteredCredentials}
+            familyMembers={familyMembers}
+            onEdit={openEditDialog}
+            onDelete={setDeleteTargetId}
+            onSend={openSendEmailDialog}
+          />
+        );
+      case 'Family Members':
+        return (
+          <FamilyMembersList
+            familyMembers={familyMembers}
+            onEdit={openEditFamilyMemberDialog}
+            onDelete={setDeleteFamilyMemberTargetId}
+          />
+        );
+      case 'Security Health':
+        return <SecurityHealthPage credentials={credentials} onEditCredential={openEditDialog} />;
+      case 'Audit Logs':
+        return <AuditLogsPage logs={auditLogs} />;
+      case 'Settings':
+        return <SettingsPage />;
+      case 'Support':
+        return <SupportPage />;
+      default:
+        return null;
+    }
+  };
+
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -344,6 +415,16 @@ export default function DashboardPage() {
               >
                 <ShieldCheck />
                 Security Health
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => setActiveMenu('Audit Logs')}
+                isActive={activeMenu === 'Audit Logs'}
+                tooltip="Audit Logs"
+              >
+                <History />
+                Audit Logs
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -419,38 +500,7 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
-            {isDataLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <>
-                {activeMenu === 'Family Members' ? (
-                  <FamilyMembersList
-                    familyMembers={familyMembers}
-                    onEdit={openEditFamilyMemberDialog}
-                    onDelete={setDeleteFamilyMemberTargetId}
-                  />
-                ) : (activeMenu === 'All Passwords' || activeMenu === 'My Passwords') ? (
-                  <PasswordList
-                    credentials={filteredCredentials}
-                    familyMembers={familyMembers}
-                    onEdit={openEditDialog}
-                    onDelete={setDeleteTargetId}
-                    onSend={openSendEmailDialog}
-                  />
-                ) : activeMenu === 'Security Health' ? (
-                   <SecurityHealthPage credentials={credentials} onEditCredential={openEditDialog} />
-                ) : activeMenu === 'Settings' ? (
-                  <SettingsPage />
-                ) : activeMenu === 'Support' ? (
-                  <SupportPage />
-                ) : null}
-              </>
-            )}
+            {renderContent()}
           </main>
         </div>
       </SidebarInset>

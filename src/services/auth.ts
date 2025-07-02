@@ -6,22 +6,26 @@ import {
   signInWithPopup,
   signOut,
   sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
 const googleProvider = new GoogleAuthProvider();
 
-export async function signUp(email: string, password: string): Promise<void> {
-    await createUserWithEmailAndPassword(auth, email, password);
+export async function signUp(email: string, password: string): Promise<User> {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
 }
 
-export async function signIn(email: string, password: string): Promise<void> {
-    await signInWithEmailAndPassword(auth, email, password);
+export async function signIn(email: string, password: string): Promise<User> {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    return userCredential.user;
 }
 
-export async function signInWithGoogle(): Promise<void> {
-    await signInWithPopup(auth, googleProvider);
+export async function signInWithGoogle(): Promise<User> {
+    const userCredential = await signInWithPopup(auth, googleProvider);
+    return userCredential.user;
 }
 
 export async function signOutUser(): Promise<void> {
