@@ -5,7 +5,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updateProfile
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -29,4 +30,11 @@ export async function signOutUser(): Promise<void> {
 
 export async function sendPasswordReset(email: string): Promise<void> {
     await sendPasswordResetEmail(auth, email);
+}
+
+export async function updateUserProfile(profile: { displayName?: string; photoURL?: string }): Promise<void> {
+  if (!auth.currentUser) {
+    throw new Error('Not authenticated. Cannot update profile.');
+  }
+  await updateProfile(auth.currentUser, profile);
 }

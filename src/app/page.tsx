@@ -60,6 +60,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
 import { signOutUser } from '@/services/auth';
+import { SettingsPage } from '@/components/dashboard/settings-page';
+import { SupportPage } from '@/components/dashboard/support-page';
 
 
 export default function DashboardPage() {
@@ -420,9 +422,9 @@ export default function DashboardPage() {
                     onDelete={setDeleteTargetId}
                   />
                 ) : activeMenu === 'Settings' ? (
-                  <div className="text-center p-8 border-2 border-dashed rounded-lg">Settings page coming soon!</div>
+                  <SettingsPage />
                 ) : activeMenu === 'Support' ? (
-                  <div className="text-center p-8 border-2 border-dashed rounded-lg">Support page coming soon!</div>
+                  <SupportPage />
                 ) : null}
               </>
             )}
@@ -485,5 +487,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-
-    
