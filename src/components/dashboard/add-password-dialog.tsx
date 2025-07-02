@@ -38,11 +38,14 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { checkPasswordStrength } from '@/ai/flows/password-strength-checker';
+import { generatePassword } from '@/ai/flows/generate-password-flow';
 import type { PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
 import type { FamilyMember, Credential } from '@/types';
-import { Check, ChevronsUpDown, Loader2, Info, Users, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Info, Users, X, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+
 
 const formSchema = z.object({
   url: z.string().url({ message: 'Please enter a valid URL.' }),
@@ -72,6 +75,8 @@ export function AddPasswordDialog({
   const [strengthResult, setStrengthResult] =
     useState<PasswordStrengthOutput | null>(null);
   const [isLoadingStrength, setIsLoadingStrength] = useState(false);
+  const [isGeneratingPassword, setIsGeneratingPassword] = useState(false);
+  const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -151,6 +156,25 @@ export function AddPasswordDialog({
       }
     }
   }, [open, credentialToEdit, form, debouncedCheckStrength]);
+  
+  const handleGeneratePassword = async () => {
+    setIsGeneratingPassword(true);
+    try {
+      const result = await generatePassword();
+      if (result.password) {
+        form.setValue('password', result.password, { shouldValidate: true });
+      }
+    } catch (error) {
+      console.error('Error generating password:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate a password.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPassword(false);
+    }
+  };
 
   const getStrengthStyle = () => {
     if (!strengthResult?.strength) return { color: 'hsl(var(--muted))', value: 0 };
@@ -234,9 +258,28 @@ export function AddPasswordDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} />
-                  </FormControl>
+                   <div className="relative">
+                    <FormControl>
+                      <Input type="password" {...field} className="pr-[110px]" />
+                    </FormControl>
+                     <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2"
+                      onClick={handleGeneratePassword}
+                      disabled={isLoadingStrength || isGeneratingPassword}
+                    >
+                      {isGeneratingPassword ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Wand2 className="mr-2 h-4 w-4" />
+                          Generate
+                        </>
+                      )}
+                    </Button>
+                  </div>
                   <div className="pt-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <Progress value={strengthValue} className="h-2" style={{'--primary': strengthColor} as React.CSSProperties} />
