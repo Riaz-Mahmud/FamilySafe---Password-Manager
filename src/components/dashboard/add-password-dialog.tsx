@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -38,14 +38,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { FamilyMember, Credential } from '@/types';
-import { Check, ChevronsUpDown, X, Eye, EyeOff, Sparkles, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, X, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { useDebounce } from '@/hooks/use-debounce';
-import { generatePassword } from '@/ai/flows/generate-password-flow';
-import { checkPasswordStrength, type PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
-import { PasswordStrengthMeter } from './password-strength-meter';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -73,10 +68,6 @@ export function AddPasswordDialog({
   credentialToEdit,
 }: AddPasswordDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isCheckingStrength, startStrengthCheck] = useTransition();
-  const [strengthResult, setStrengthResult] = useState<PasswordStrengthOutput | null>(null);
-  const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -90,24 +81,9 @@ export function AddPasswordDialog({
     },
   });
 
-  const passwordValue = form.watch('password');
-  const debouncedPassword = useDebounce(passwordValue, 500);
-
-  useEffect(() => {
-    if (debouncedPassword) {
-      startStrengthCheck(async () => {
-        const result = await checkPasswordStrength({ password: debouncedPassword });
-        setStrengthResult(result);
-      });
-    } else {
-      setStrengthResult(null);
-    }
-  }, [debouncedPassword]);
-
   useEffect(() => {
     if (open) {
       setShowPassword(false);
-      setStrengthResult(null);
       if (credentialToEdit) {
         form.reset({
           url: credentialToEdit.url,
@@ -128,24 +104,6 @@ export function AddPasswordDialog({
     }
   }, [open, credentialToEdit, form]);
   
-  const handleGeneratePassword = async () => {
-    setIsGenerating(true);
-    try {
-      const result = await generatePassword();
-      form.setValue('password', result.password, { shouldValidate: true });
-      setShowPassword(true);
-    } catch (error) {
-      console.error("Failed to generate password:", error);
-      toast({
-        title: 'Error',
-        description: 'Could not generate a password at this time.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (credentialToEdit) {
       onUpdateCredential({
@@ -218,7 +176,7 @@ export function AddPasswordDialog({
                       <Input
                         type={showPassword ? 'text' : 'password'}
                         {...field}
-                        className="pr-20"
+                        className="pr-10"
                       />
                     </FormControl>
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
@@ -239,31 +197,12 @@ export function AddPasswordDialog({
                           {showPassword ? 'Hide password' : 'Show password'}
                         </span>
                       </Button>
-                       <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={handleGeneratePassword}
-                        disabled={isGenerating}
-                        tabIndex={-1}
-                      >
-                        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin"/> : <Sparkles className="h-4 w-4 text-primary" />}
-                        <span className="sr-only">Generate password</span>
-                      </Button>
                     </div>
                   </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
-            {(isCheckingStrength || strengthResult) && (
-              <PasswordStrengthMeter 
-                strengthResult={strengthResult}
-                isChecking={isCheckingStrength} 
-              />
-            )}
 
             <FormField
               control={form.control}

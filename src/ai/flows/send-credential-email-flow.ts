@@ -30,30 +30,6 @@ export async function sendCredentialEmail(input: SendCredentialEmailInput): Prom
   return sendCredentialEmailFlow(input);
 }
 
-const EmailContentSchema = z.object({
-  subject: z.string().describe('The subject line for the email.'),
-  body: z.string().describe('The body content for the email, formatted for plain text.'),
-});
-
-const generateEmailContentPrompt = ai.definePrompt({
-  name: 'generateEmailContentPrompt',
-  input: {schema: SendCredentialEmailInputSchema},
-  output: {schema: EmailContentSchema},
-  prompt: `You are an AI assistant for a family password manager called FamilySafe. Your task is to generate the content for an email that shares credential details.
-
-The email should be professional, clear, and friendly.
-
-It should contain the following information:
-- Website/Application: {{{url}}}
-- Username: {{{username}}}
-- Password: {{{password}}}
-
-Generate a subject line and a body for the email.
-The subject should be clear, like "Your credentials for [Website Name]".
-The body should state that the credentials are being shared from a FamilySafe account and should clearly list the URL/Name, username, and password. Add a friendly closing.
-Do not include the recipient's name in the body, as it will be sent to multiple people.`,
-});
-
 const sendCredentialEmailFlow = ai.defineFlow(
   {
     name: 'sendCredentialEmailFlow',
@@ -61,11 +37,10 @@ const sendCredentialEmailFlow = ai.defineFlow(
     outputSchema: SendCredentialEmailOutputSchema,
   },
   async (input) => {
-    const {output: emailContent} = await generateEmailContentPrompt(input);
-
-    if (!emailContent) {
-      return { success: false, message: 'Failed to generate email content.' };
-    }
+    const emailContent = {
+      subject: `Your credentials for ${input.url}`,
+      body: `Hello,\n\nHere are the credential details for ${input.url}, shared from your FamilySafe account:\n\nWebsite/Application: ${input.url}\nUsername: ${input.username}\nPassword: ${input.password}\n\nRegards,\nThe FamilySafe Team`
+    };
 
     const sendGridApiKey = process.env.SENDGRID_API_KEY;
     const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
