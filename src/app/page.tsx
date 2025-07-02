@@ -44,12 +44,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { AddFamilyMemberDialog } from '@/components/dashboard/add-family-member-dialog';
 
 export default function DashboardPage() {
   const [credentials, setCredentials] = useState<Credential[]>(mockCredentials);
-  const [familyMembers] = useState<FamilyMember[]>(mockFamilyMembers);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(mockFamilyMembers);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -88,6 +90,19 @@ export default function DashboardPage() {
       });
       setDeleteTargetId(null);
     }
+  };
+
+  const handleAddFamilyMember = (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
+    const memberToAdd: FamilyMember = {
+      ...newMember,
+      id: Date.now().toString(),
+      avatar: `https://placehold.co/40x40.png`,
+    };
+    setFamilyMembers(prev => [...prev, memberToAdd]);
+    toast({
+      title: 'Family Member Added',
+      description: `${newMember.name} has been invited to your family.`,
+    });
   };
 
   const openAddDialog = () => {
@@ -225,7 +240,7 @@ export default function DashboardPage() {
             ) : activeMenu === 'Family Members' ? (
               <>
                 <div className="flex-1" />
-                <Button className="font-semibold">
+                <Button onClick={() => setAddFamilyMemberDialogOpen(true)} className="font-semibold">
                   <Plus className="mr-2 h-5 w-5" />
                   Add Family Member
                 </Button>
@@ -260,6 +275,12 @@ export default function DashboardPage() {
         onUpdateCredential={handleUpdateCredential}
         familyMembers={familyMembers}
         credentialToEdit={editingCredential}
+      />
+
+      <AddFamilyMemberDialog
+        open={isAddFamilyMemberDialogOpen}
+        onOpenChange={setAddFamilyMemberDialogOpen}
+        onAddFamilyMember={handleAddFamilyMember}
       />
       
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
