@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -36,16 +36,11 @@ import {
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
-import { checkPasswordStrength } from '@/ai/flows/password-strength-checker';
-import { generatePassword } from '@/ai/flows/generate-password-flow';
-import type { PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
 import type { FamilyMember, Credential } from '@/types';
-import { Check, ChevronsUpDown, Loader2, Info, Users, X, Wand2, Eye, EyeOff } from 'lucide-react';
+import { Check, ChevronsUpDown, X, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
 
 
 const formSchema = z.object({
@@ -73,12 +68,7 @@ export function AddPasswordDialog({
   familyMembers,
   credentialToEdit,
 }: AddPasswordDialogProps) {
-  const [strengthResult, setStrengthResult] =
-    useState<PasswordStrengthOutput | null>(null);
-  const [isLoadingStrength, setIsLoadingStrength] = useState(false);
-  const [isGeneratingPassword, setIsGeneratingPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -92,45 +82,6 @@ export function AddPasswordDialog({
     },
   });
 
-  const password = form.watch('password');
-
-  const debounce = <F extends (...args: any[]) => any>(
-    func: F,
-    waitFor: number
-  ) => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    return (...args: Parameters<F>): Promise<ReturnType<F>> =>
-      new Promise(resolve => {
-        if (timeout) {
-          clearTimeout(timeout);
-        }
-        timeout = setTimeout(() => resolve(func(...args)), waitFor);
-      });
-  };
-
-  const checkStrength = async (pass: string) => {
-    if (!pass) {
-      setStrengthResult(null);
-      return;
-    }
-    setIsLoadingStrength(true);
-    try {
-      const result = await checkPasswordStrength({ password: pass });
-      setStrengthResult(result);
-    } catch (error) {
-      console.error('Error checking password strength:', error);
-      setStrengthResult(null);
-    } finally {
-      setIsLoadingStrength(false);
-    }
-  };
-
-  const debouncedCheckStrength = useCallback(debounce(checkStrength, 500), []);
-
-  useEffect(() => {
-    debouncedCheckStrength(password);
-  }, [password, debouncedCheckStrength]);
-
   useEffect(() => {
     if (open) {
       setShowPassword(false);
@@ -142,11 +93,6 @@ export function AddPasswordDialog({
           notes: credentialToEdit.notes,
           sharedWith: credentialToEdit.sharedWith,
         });
-        if (credentialToEdit.password) {
-          debouncedCheckStrength(credentialToEdit.password);
-        } else {
-          setStrengthResult(null);
-        }
       } else {
         form.reset({
           url: '',
@@ -155,45 +101,10 @@ export function AddPasswordDialog({
           notes: '',
           sharedWith: [],
         });
-        setStrengthResult(null);
       }
     }
-  }, [open, credentialToEdit, form, debouncedCheckStrength]);
+  }, [open, credentialToEdit, form]);
   
-  const handleGeneratePassword = async () => {
-    setIsGeneratingPassword(true);
-    try {
-      const result = await generatePassword();
-      if (result.password) {
-        form.setValue('password', result.password, { shouldValidate: true });
-      }
-    } catch (error) {
-      console.error('Error generating password:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate a password.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGeneratingPassword(false);
-    }
-  };
-
-  const getStrengthStyle = () => {
-    if (!strengthResult?.strength) return { color: 'hsl(var(--muted))', value: 0 };
-    switch (strengthResult.strength.toLowerCase()) {
-      case 'weak':
-        return { color: 'hsl(var(--destructive))', value: 33 };
-      case 'moderate':
-        return { color: 'hsl(var(--chart-4))', value: 66 };
-      case 'strong':
-        return { color: 'hsl(var(--chart-2))', value: 100 };
-      default:
-        return { color: 'hsl(var(--muted))', value: 0 };
-    }
-  };
-  const { color: strengthColor, value: strengthValue } = getStrengthStyle();
-
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (credentialToEdit) {
       onUpdateCredential({
@@ -266,10 +177,10 @@ export function AddPasswordDialog({
                       <Input
                         type={showPassword ? 'text' : 'password'}
                         {...field}
-                        className="pr-[154px]"
+                        className="pr-12"
                       />
                     </FormControl>
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
                       <Button
                         type="button"
                         variant="ghost"
@@ -287,35 +198,7 @@ export function AddPasswordDialog({
                           {showPassword ? 'Hide password' : 'Show password'}
                         </span>
                       </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleGeneratePassword}
-                        disabled={isLoadingStrength || isGeneratingPassword}
-                      >
-                        {isGeneratingPassword ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Wand2 className="mr-2 h-4 w-4" />
-                            Generate
-                          </>
-                        )}
-                      </Button>
                     </div>
-                  </div>
-                  <div className="pt-2 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Progress value={strengthValue} className="h-2" style={{'--primary': strengthColor} as React.CSSProperties} />
-                      {isLoadingStrength && <Loader2 className="h-4 w-4 animate-spin" />}
-                    </div>
-                    {strengthResult && !isLoadingStrength && (
-                       <div className="text-xs p-3 bg-secondary rounded-md border">
-                          <p className="font-semibold flex items-center gap-1.5"><Info className="h-3 w-3" /> {strengthResult.reason}</p>
-                          <p className="text-muted-foreground mt-1">{strengthResult.suggestions}</p>
-                       </div>
-                    )}
                   </div>
                   <FormMessage />
                 </FormItem>

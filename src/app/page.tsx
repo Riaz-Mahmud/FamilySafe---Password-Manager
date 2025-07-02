@@ -62,8 +62,6 @@ import { useAuth } from '@/context/auth-provider';
 import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
-import { sendCredentialEmail, type SendCredentialEmailOutput } from '@/ai/flows/send-credential-email-flow';
-import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 
 
 export default function DashboardPage() {
@@ -81,8 +79,6 @@ export default function DashboardPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
-  const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
-  const [sentEmailData, setSentEmailData] = useState<Pick<SendCredentialEmailOutput, 'emailSubject' | 'emailBody' | 'message'> | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -180,39 +176,6 @@ export default function DashboardPage() {
     }
   };
   
-  const handleInitiateSendEmail = (credential: Credential) => {
-    setCredentialToSend(credential);
-  };
-
-  const handleSendEmail = async (emails: string[], credential: Credential) => {
-    try {
-      const result = await sendCredentialEmail({
-        emails,
-        url: credential.url,
-        username: credential.username,
-        password: credential.password,
-      });
-      if (result.success) {
-        setSentEmailData({
-          emailSubject: result.emailSubject,
-          emailBody: result.emailBody,
-          message: result.message,
-        });
-      } else {
-        throw new Error(result.message || 'Failed to process email request.');
-      }
-    } catch (error: any) {
-      console.error('Error sending email:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to process credential email.',
-        variant: 'destructive',
-      });
-    } finally {
-      setCredentialToSend(null);
-    }
-  };
-
   const handleAddFamilyMember = async (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
      if(!user) return;
      try {
@@ -457,7 +420,6 @@ export default function DashboardPage() {
                     familyMembers={familyMembers}
                     onEdit={openEditDialog}
                     onDelete={setDeleteTargetId}
-                    onSendEmail={handleInitiateSendEmail}
                   />
                 ) : activeMenu === 'Settings' ? (
                   <SettingsPage />
@@ -487,15 +449,6 @@ export default function DashboardPage() {
         familyMemberToEdit={editingFamilyMember}
       />
       
-      <SendEmailDialog
-        open={!!credentialToSend}
-        onOpenChange={(open) => !open && setCredentialToSend(null)}
-        credential={credentialToSend}
-        familyMembers={familyMembers}
-        user={user}
-        onSendEmail={handleSendEmail}
-      />
-
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -526,34 +479,6 @@ export default function DashboardPage() {
             <AlertDialogCancel onClick={() => setDeleteFamilyMemberTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteFamilyMember} className="bg-destructive hover:bg-destructive/90">
               Remove Member
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!sentEmailData} onOpenChange={(open) => !open && setSentEmailData(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Email Content Preview</AlertDialogTitle>
-            <AlertDialogDescription>
-              {sentEmailData?.message}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
-            <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Subject:</h4>
-                <p className="text-sm p-3 bg-secondary rounded-md border">{sentEmailData?.emailSubject}</p>
-            </div>
-            <div className="space-y-1">
-                <h4 className="text-sm font-semibold">Body:</h4>
-                <div className="text-sm p-3 bg-secondary rounded-md border whitespace-pre-wrap">
-                    {sentEmailData?.emailBody}
-                </div>
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setSentEmailData(null)}>
-              Close
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
