@@ -62,6 +62,8 @@ import { useAuth } from '@/context/auth-provider';
 import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
+import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
+import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 
 
 export default function DashboardPage() {
@@ -79,6 +81,7 @@ export default function DashboardPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
+  const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -173,6 +176,38 @@ export default function DashboardPage() {
       } finally {
         setDeleteTargetId(null);
       }
+    }
+  };
+  
+  const handleInitiateSendEmail = (credential: Credential) => {
+    setCredentialToSend(credential);
+  };
+
+  const handleSendEmail = async (emails: string[], credential: Credential) => {
+    try {
+      const result = await sendCredentialEmail({
+        emails,
+        url: credential.url,
+        username: credential.username,
+        password: credential.password,
+      });
+      if (result.success) {
+        toast({
+          title: 'Email Sent',
+          description: result.message,
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send credential email.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCredentialToSend(null);
     }
   };
 
@@ -420,6 +455,7 @@ export default function DashboardPage() {
                     familyMembers={familyMembers}
                     onEdit={openEditDialog}
                     onDelete={setDeleteTargetId}
+                    onSendEmail={handleInitiateSendEmail}
                   />
                 ) : activeMenu === 'Settings' ? (
                   <SettingsPage />
@@ -449,6 +485,15 @@ export default function DashboardPage() {
         familyMemberToEdit={editingFamilyMember}
       />
       
+      <SendEmailDialog
+        open={!!credentialToSend}
+        onOpenChange={(open) => !open && setCredentialToSend(null)}
+        credential={credentialToSend}
+        familyMembers={familyMembers}
+        user={user}
+        onSendEmail={handleSendEmail}
+      />
+
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

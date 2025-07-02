@@ -13,6 +13,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
@@ -24,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
 
 type PasswordListProps = {
@@ -32,6 +33,7 @@ type PasswordListProps = {
   familyMembers: FamilyMember[];
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
+  onSendEmail: (credential: Credential) => void;
 };
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -40,7 +42,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   Bot,
 };
 
-export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: PasswordListProps) {
+export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSendEmail }: PasswordListProps) {
   const { toast } = useToast();
 
   const handleCopy = (text: string, field: string) => {
@@ -90,8 +92,8 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: P
                       <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
                         <IconComponent className="w-5 h-5 text-muted-foreground" />
                       </div>
-                      <div className="flex flex-col">
-                        <span className="font-medium truncate">{new URL(credential.url).hostname}</span>
+                      <div className="flex flex-col overflow-hidden">
+                        <a href={credential.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline">{new URL(credential.url).hostname}</a>
                         <span className="text-sm text-muted-foreground truncate">{credential.url}</span>
                       </div>
                     </div>
@@ -164,6 +166,11 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: P
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => onSendEmail(credential)}>
+                                <Mail className="mr-2 h-4 w-4" />
+                                Send to Email
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => onDelete(credential.id)}
