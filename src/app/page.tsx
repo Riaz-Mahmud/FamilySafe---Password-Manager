@@ -1,6 +1,8 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -22,7 +24,7 @@ import {
   Search,
   LogOut,
   LifeBuoy,
-  KeyRound,
+  Loader2,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -56,12 +58,17 @@ import {
   deleteFamilyMember,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/context/auth-provider';
+import { signOutUser } from '@/services/auth';
 
 
 export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
@@ -73,12 +80,19 @@ export default function DashboardPage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [user, authLoading, router]);
+
+  useEffect(() => {
     async function loadData() {
-      setIsLoading(true);
+      if (!user) return;
+      setIsDataLoading(true);
       try {
         const [creds, members] = await Promise.all([
-          getCredentials(),
-          getFamilyMembers(),
+          getCredentials(user.uid),
+          getFamilyMembers(user.uid),
         ]);
         setCredentials(creds);
         setFamilyMembers(members);
@@ -90,16 +104,22 @@ export default function DashboardPage() {
           variant: 'destructive',
         });
       } finally {
-        setIsLoading(false);
+        setIsDataLoading(false);
       }
     }
     loadData();
-  }, [toast]);
+  }, [toast, user]);
+
+  const handleSignOut = async () => {
+    await signOutUser();
+    router.push('/login');
+  };
 
   const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
+    if(!user) return;
     try {
-      const addedCredential = await addCredential(newCredential);
-      setCredentials(prev => [addedCredential, ...prev].sort((a,b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()));
+      const addedCredential = await addCredential(user.uid, newCredential);
+      setCredentials(prev => [addedCredential, ...prev]);
       toast({
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
@@ -111,9 +131,10 @@ export default function DashboardPage() {
   };
 
   const handleUpdateCredential = async (updatedCredential: Credential) => {
+    if(!user) return;
     try {
       const { id, ...dataToUpdate } = updatedCredential;
-      await updateCredential(id, dataToUpdate);
+      await updateCredential(user.uid, id, dataToUpdate);
       setCredentials(prev =>
         prev.map(c => (c.id === updatedCredential.id ? updatedCredential : c))
       );
@@ -128,9 +149,9 @@ export default function DashboardPage() {
   };
 
   const handleDeleteCredential = async () => {
-    if (deleteTargetId) {
+    if (deleteTargetId && user) {
       try {
-        await deleteCredential(deleteTargetId);
+        await deleteCredential(user.uid, deleteTargetId);
         setCredentials(prev => prev.filter(c => c.id !== deleteTargetId));
         toast({
           title: 'Credential Deleted',
@@ -147,12 +168,13 @@ export default function DashboardPage() {
   };
 
   const handleAddFamilyMember = async (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
+     if(!user) return;
      try {
         const memberToAdd = {
             ...newMember,
             avatar: `https://placehold.co/40x40.png`,
         };
-        const addedMember = await addFamilyMember(memberToAdd);
+        const addedMember = await addFamilyMember(user.uid, memberToAdd);
         setFamilyMembers(prev => [...prev, addedMember]);
         toast({
             title: 'Family Member Added',
@@ -165,8 +187,9 @@ export default function DashboardPage() {
   };
 
   const handleUpdateFamilyMember = async (updatedMember: FamilyMember) => {
+    if(!user) return;
     try {
-        await updateFamilyMember(updatedMember.id, updatedMember);
+        await updateFamilyMember(user.uid, updatedMember.id, updatedMember);
         setFamilyMembers(prev =>
             prev.map(m => (m.id === updatedMember.id ? updatedMember : m))
         );
@@ -184,9 +207,9 @@ export default function DashboardPage() {
   };
 
   const handleDeleteFamilyMember = async () => {
-    if (deleteFamilyMemberTargetId) {
+    if (deleteFamilyMemberTargetId && user) {
       try {
-          await deleteFamilyMember(deleteFamilyMemberTargetId);
+          await deleteFamilyMember(user.uid, deleteFamilyMemberTargetId);
           setFamilyMembers(prev => prev.filter(m => m.id !== deleteFamilyMemberTargetId));
           toast({
               title: 'Family Member Removed',
@@ -252,6 +275,14 @@ export default function DashboardPage() {
     return true;
   });
 
+  if (authLoading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -314,14 +345,14 @@ export default function DashboardPage() {
           <Separator className="my-2" />
           <div className="flex items-center gap-3 p-2">
             <Avatar>
-              <AvatarImage data-ai-hint="person" src="https://placehold.co/40x40.png" alt="User" />
-              <AvatarFallback>U</AvatarFallback>
+              <AvatarImage data-ai-hint="person" src={user.photoURL || `https://placehold.co/40x40.png`} alt={user.displayName || 'User'} />
+              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
-              <span className="font-semibold truncate">User Name</span>
-              <span className="text-sm text-muted-foreground truncate">user@familysafe.com</span>
+              <span className="font-semibold truncate">{user.displayName || 'User'}</span>
+              <span className="text-sm text-muted-foreground truncate">{user.email}</span>
             </div>
-            <Button variant="ghost" size="icon" className="ml-auto">
+            <Button variant="ghost" size="icon" className="ml-auto" onClick={handleSignOut}>
               <LogOut />
             </Button>
           </div>
@@ -361,7 +392,7 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
-            {isLoading ? (
+            {isDataLoading ? (
               <div className="space-y-4">
                 <Skeleton className="h-16 w-full" />
                 <Skeleton className="h-16 w-full" />

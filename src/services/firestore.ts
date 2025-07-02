@@ -1,3 +1,4 @@
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember } from '@/types';
 import {
@@ -9,6 +10,8 @@ import {
   doc,
   serverTimestamp,
   Timestamp,
+  query,
+  orderBy,
 } from 'firebase/firestore';
 
 // --- Helpers ---
@@ -21,10 +24,10 @@ function formatTimestamp(timestamp: Timestamp | undefined): string {
 
 // --- Credentials ---
 
-const credentialsCol = collection(db, 'credentials');
-
-export async function getCredentials(): Promise<Credential[]> {
-  const snapshot = await getDocs(credentialsCol);
+export async function getCredentials(userId: string): Promise<Credential[]> {
+  const credentialsCol = collection(db, 'users', userId, 'credentials');
+  const q = query(credentialsCol, orderBy('lastModified', 'desc'));
+  const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => {
       const data = doc.data();
       return {
@@ -40,51 +43,53 @@ export async function getCredentials(): Promise<Credential[]> {
   });
 }
 
-export async function addCredential(credential: Omit<Credential, 'id' | 'lastModified'>): Promise<Credential> {
+export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified'>): Promise<Credential> {
+  const credentialsCol = collection(db, 'users', userId, 'credentials');
   const docRef = await addDoc(credentialsCol, {
     ...credential,
     lastModified: serverTimestamp(),
   });
-  return {
+  const newCredential = {
     ...credential,
     id: docRef.id,
     lastModified: new Date().toLocaleDateString(),
   };
+  return newCredential;
 }
 
-export async function updateCredential(id: string, credential: Partial<Omit<Credential, 'id'>>): Promise<void> {
-  const docRef = doc(db, 'credentials', id);
+export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id'>>): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'credentials', id);
   await updateDoc(docRef, {
       ...credential,
       lastModified: serverTimestamp(),
   });
 }
 
-export async function deleteCredential(id: string): Promise<void> {
-  const docRef = doc(db, 'credentials', id);
+export async function deleteCredential(userId: string, id: string): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'credentials', id);
   await deleteDoc(docRef);
 }
 
 // --- Family Members ---
 
-const familyMembersCol = collection(db, 'familyMembers');
-
-export async function getFamilyMembers(): Promise<FamilyMember[]> {
+export async function getFamilyMembers(userId: string): Promise<FamilyMember[]> {
+  const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   const snapshot = await getDocs(familyMembersCol);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyMember));
 }
 
-export async function addFamilyMember(member: Omit<FamilyMember, 'id'>): Promise<FamilyMember> {
+export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id'>): Promise<FamilyMember> {
+  const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   const docRef = await addDoc(familyMembersCol, member);
   return { ...member, id: docRef.id };
 }
 
-export async function updateFamilyMember(id: string, member: Partial<FamilyMember>): Promise<void> {
-  const docRef = doc(db, 'familyMembers', id);
+export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'familyMembers', id);
   await updateDoc(docRef, member);
 }
 
-export async function deleteFamilyMember(id: string): Promise<void> {
-  const docRef = doc(db, 'familyMembers', id);
+export async function deleteFamilyMember(userId: string, id: string): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'familyMembers', id);
   await deleteDoc(docRef);
 }
