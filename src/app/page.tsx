@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
-  const [sentEmailData, setSentEmailData] = useState<Pick<SendCredentialEmailOutput, 'emailSubject' | 'emailBody'> | null>(null);
+  const [sentEmailData, setSentEmailData] = useState<Pick<SendCredentialEmailOutput, 'emailSubject' | 'emailBody' | 'message'> | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -193,15 +193,19 @@ export default function DashboardPage() {
         password: credential.password,
       });
       if (result.success) {
-        setSentEmailData({ emailSubject: result.emailSubject, emailBody: result.emailBody });
+        setSentEmailData({
+          emailSubject: result.emailSubject,
+          emailBody: result.emailBody,
+          message: result.message,
+        });
       } else {
-        throw new Error(result.message || 'Failed to generate email content.');
+        throw new Error(result.message || 'Failed to process email request.');
       }
     } catch (error: any) {
       console.error('Error sending email:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to generate credential email.',
+        description: error.message || 'Failed to process credential email.',
         variant: 'destructive',
       });
     } finally {
@@ -530,9 +534,9 @@ export default function DashboardPage() {
       <AlertDialog open={!!sentEmailData} onOpenChange={(open) => !open && setSentEmailData(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Email Simulation</AlertDialogTitle>
+            <AlertDialogTitle>Email Content Preview</AlertDialogTitle>
             <AlertDialogDescription>
-              This is a simulation. In a real application, the following email would be sent to the selected recipients. No email has actually been sent.
+              {sentEmailData?.message}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">

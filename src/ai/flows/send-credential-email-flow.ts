@@ -1,18 +1,17 @@
 'use server';
 /**
- * @fileOverview A flow to generate and "send" an email with credential details.
- * This flow writes to a 'mail' collection in Firestore, which can be used
- * with the "Trigger Email" Firebase Extension to send real emails.
+ * @fileOverview A flow to generate and send an email with credential details.
+ * This flow sends a real email using SendGrid if configured, otherwise
+ * it returns the content for simulation.
  *
- * - sendCredentialEmail - A function that handles generating the email content.
+ * - sendCredentialEmail - A function that handles generating and sending the email.
  * - SendCredentialEmailInput - The input type for the sendCredentialEmail function.
  * - SendCredentialEmailOutput - The return type for the sendCredentialEmail function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { db } from '@/lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import sgMail from '@sendgrid/mail';
 
 const SendCredentialEmailInputSchema = z.object({
   emails: z.array(z.string().email()).describe('The list of email addresses to send the credential to.'),
@@ -23,8 +22,8 @@ const SendCredentialEmailInputSchema = z.object({
 export type SendCredentialEmailInput = z.infer<typeof SendCredentialEmailInputSchema>;
 
 const SendCredentialEmailOutputSchema = z.object({
-  success: z.boolean().describe('Whether the email was "sent" successfully.'),
-  message: z.string().describe('A confirmation message about the simulation.'),
+  success: z.boolean().describe('Whether the email was sent successfully.'),
+  message: z.string().describe('A confirmation message.'),
   emailSubject: z.string().describe('The subject line of the generated email.'),
   emailBody: z.string().describe('The body content of the generated email.'),
 });
@@ -58,8 +57,6 @@ The body should state that the credentials are being shared from a FamilySafe ac
 Do not include the recipient's name in the body, as it will be sent to multiple people.`,
 });
 
-// This flow now also writes to Firestore to trigger the "Trigger Email" Firebase Extension.
-// The simulation dialog will still be shown to the user.
 const sendCredentialEmailFlow = ai.defineFlow(
   {
     name: 'sendCredentialEmailFlow',
@@ -67,33 +64,45 @@ const sendCredentialEmailFlow = ai.defineFlow(
     outputSchema: SendCredentialEmailOutputSchema,
   },
   async (input) => {
-    const {output} = await generateEmailContentPrompt(input);
+    const {output: emailContent} = await generateEmailContentPrompt(input);
 
-    if (!output) {
+    if (!emailContent) {
       throw new Error('Failed to generate email content.');
     }
-    
-    // This will trigger the Firebase Email Extension if it's installed.
-    try {
-      const mailCol = collection(db, 'mail');
-      await addDoc(mailCol, {
-        to: input.emails,
-        message: {
-          subject: output.subject,
-          text: output.body,
-        },
-      });
-      console.log('Email document added to Firestore "mail" collection.');
-    } catch (error) {
-        // Log the error but don't fail the whole flow, so the simulation can still be shown.
-        console.error('Error writing email document to Firestore:', error);
+
+    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
+    let message = '';
+
+    if (sendGridApiKey && sendGridFromEmail) {
+        sgMail.setApiKey(sendGridApiKey);
+        const msg = {
+            to: input.emails,
+            from: sendGridFromEmail,
+            subject: emailContent.subject,
+            text: emailContent.body,
+        };
+
+        try {
+            await sgMail.send(msg);
+            console.log('Credential email sent successfully via SendGrid.');
+            message = `An email with the credentials for ${new URL(input.url).hostname} has been sent to the selected recipients.`;
+        } catch (error) {
+            console.error('Error sending email via SendGrid:', error);
+            // Don't fail the whole flow, just log the error and update the message
+            message = `There was an error sending the email via SendGrid. Please check server logs. The generated content is available for review.`;
+        }
+
+    } else {
+      console.warn('SendGrid API Key or From Email not found in environment variables. Email will not be sent.');
+      message = `Email sending is not configured. This is a simulation of the email that would be sent for ${new URL(input.url).hostname}.`;
     }
 
     return {
       success: true,
-      message: `Email content generated for ${new URL(input.url).hostname}. If the Trigger Email extension is installed, an email will be sent.`,
-      emailSubject: output.subject,
-      emailBody: output.body,
+      message, // This message will be used in the toast/alert.
+      emailSubject: emailContent.subject,
+      emailBody: emailContent.body,
     };
   }
 );
