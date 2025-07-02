@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
+import { FamilyMembersList } from '@/components/dashboard/family-members-list';
 import type { Credential, FamilyMember } from '@/types';
 import { mockCredentials, mockFamilyMembers } from '@/data/mock';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -106,10 +107,24 @@ export default function DashboardPage() {
     setAddDialogOpen(open);
   };
 
-  const filteredCredentials = credentials.filter(c =>
-    c.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCredentials = credentials.filter(credential => {
+    const searchMatch =
+      credential.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      credential.username.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!searchMatch) {
+      return false;
+    }
+
+    if (activeMenu === 'My Passwords') {
+      // Assuming "My Passwords" are those not shared with anyone.
+      // In a real app, this would be based on the owner's ID.
+      return credential.sharedWith.length === 0;
+    }
+    
+    // For "All Passwords", we already filtered by search, so return true.
+    return true;
+  });
 
   return (
     <SidebarProvider>
@@ -154,7 +169,7 @@ export default function DashboardPage() {
         <SidebarFooter className="mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Support">
+              <SidebarMenuButton onClick={() => setActiveMenu('Support')} isActive={activeMenu === 'Support'} tooltip="Support">
                 <LifeBuoy />
                 Support
               </SidebarMenuButton>
@@ -191,29 +206,49 @@ export default function DashboardPage() {
         <div className="p-4 sm:p-6 lg:p-8 flex flex-col h-screen">
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search passwords..."
-                className="pl-10 w-full max-w-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <Button onClick={openAddDialog} className="font-semibold">
-              <Plus className="mr-2 h-5 w-5" />
-              Add Credential
-            </Button>
+            {activeMenu === 'All Passwords' || activeMenu === 'My Passwords' ? (
+              <>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search passwords..."
+                    className="pl-10 w-full max-w-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Button onClick={openAddDialog} className="font-semibold">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Add Credential
+                </Button>
+              </>
+            ) : activeMenu === 'Family Members' ? (
+              <>
+                <div className="flex-1" />
+                <Button className="font-semibold">
+                  <Plus className="mr-2 h-5 w-5" />
+                  Add Family Member
+                </Button>
+              </>
+            ) : <div className="flex-1" />}
           </header>
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
-            <PasswordList
-              credentials={filteredCredentials}
-              familyMembers={familyMembers}
-              onEdit={openEditDialog}
-              onDelete={setDeleteTargetId}
-            />
+            {activeMenu === 'Family Members' ? (
+              <FamilyMembersList familyMembers={familyMembers} />
+            ) : (activeMenu === 'All Passwords' || activeMenu === 'My Passwords') ? (
+              <PasswordList
+                credentials={filteredCredentials}
+                familyMembers={familyMembers}
+                onEdit={openEditDialog}
+                onDelete={setDeleteTargetId}
+              />
+            ) : activeMenu === 'Settings' ? (
+              <div className="text-center p-8 border-2 border-dashed rounded-lg">Settings page coming soon!</div>
+            ) : activeMenu === 'Support' ? (
+              <div className="text-center p-8 border-2 border-dashed rounded-lg">Support page coming soon!</div>
+            ) : null}
           </main>
         </div>
       </SidebarInset>
