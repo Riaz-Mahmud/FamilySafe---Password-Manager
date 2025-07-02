@@ -25,6 +25,7 @@ import {
   LogOut,
   LifeBuoy,
   Loader2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,7 @@ import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
 import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
+import { SecurityHealthPage } from '@/components/dashboard/security-health-page';
 
 
 export default function DashboardPage() {
@@ -334,6 +336,16 @@ export default function DashboardPage() {
                 Family Members
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => setActiveMenu('Security Health')}
+                isActive={activeMenu === 'Security Health'}
+                tooltip="Security Health"
+              >
+                <ShieldCheck />
+                Security Health
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="mt-auto">
@@ -430,6 +442,8 @@ export default function DashboardPage() {
                     onDelete={setDeleteTargetId}
                     onSend={openSendEmailDialog}
                   />
+                ) : activeMenu === 'Security Health' ? (
+                   <SecurityHealthPage credentials={credentials} onEditCredential={openEditDialog} />
                 ) : activeMenu === 'Settings' ? (
                   <SettingsPage />
                 ) : activeMenu === 'Support' ? (
