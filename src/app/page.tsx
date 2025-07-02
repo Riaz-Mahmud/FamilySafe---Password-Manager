@@ -27,6 +27,7 @@ import {
   Loader2,
   ShieldCheck,
   History,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -34,7 +35,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember, AuditLog } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -60,6 +61,8 @@ import {
   deleteFamilyMember,
   addAuditLog,
   getAuditLogs,
+  getDeviceSessions,
+  revokeDeviceSession,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -69,6 +72,7 @@ import { SupportPage } from '@/components/dashboard/support-page';
 import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 import { SecurityHealthPage } from '@/components/dashboard/security-health-page';
 import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
+import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 
 
 export default function DashboardPage() {
@@ -78,6 +82,7 @@ export default function DashboardPage() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
@@ -102,6 +107,7 @@ export default function DashboardPage() {
       setCredentials([]);
       setFamilyMembers([]);
       setAuditLogs([]);
+      setDeviceSessions([]);
       setIsDataLoading(false);
       return;
     }
@@ -109,7 +115,7 @@ export default function DashboardPage() {
     setIsDataLoading(true);
     
     let loadedCount = 0;
-    const totalToLoad = 3;
+    const totalToLoad = 4;
 
     const checkDone = () => {
       loadedCount++;
@@ -132,11 +138,19 @@ export default function DashboardPage() {
       setAuditLogs(logs);
       checkDone();
     });
+    
+    const currentSessionId = localStorage.getItem('sessionId');
+    const unsubscribeSessions = getDeviceSessions(user.uid, currentSessionId, (sessions) => {
+      setDeviceSessions(sessions);
+      checkDone();
+    });
+
 
     return () => {
       unsubscribeCredentials();
       unsubscribeFamilyMembers();
       unsubscribeAuditLogs();
+      unsubscribeSessions();
     };
   }, [user?.uid]);
 
@@ -260,6 +274,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleRevokeSession = async (sessionId: string) => {
+    if (!user) return;
+    try {
+      await revokeDeviceSession(user.uid, sessionId);
+      await addAuditLog(user.uid, 'Device Revoked', `Revoked access for a device session.`);
+      toast({
+        title: 'Device Revoked',
+        description: 'The device session has been revoked.',
+      });
+    } catch (error) {
+      console.error("Error revoking session:", error);
+      toast({ title: 'Error', description: 'Failed to revoke device session.', variant: 'destructive' });
+    }
+  };
+
+
   const openAddDialog = () => {
     setEditingCredential(null);
     setAddDialogOpen(true);
@@ -359,6 +389,8 @@ export default function DashboardPage() {
         return <SecurityHealthPage credentials={credentials} onEditCredential={openEditDialog} />;
       case 'Audit Logs':
         return <AuditLogsPage logs={auditLogs} />;
+      case 'Device Management':
+        return <DeviceManagementPage sessions={deviceSessions} onRevoke={handleRevokeSession} />;
       case 'Settings':
         return <SettingsPage />;
       case 'Support':
@@ -425,6 +457,16 @@ export default function DashboardPage() {
               >
                 <History />
                 Audit Logs
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => setActiveMenu('Device Management')}
+                isActive={activeMenu === 'Device Management'}
+                tooltip="Device Management"
+              >
+                <MonitorSmartphone />
+                Device Management
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

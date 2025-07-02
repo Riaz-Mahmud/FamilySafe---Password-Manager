@@ -22,3 +22,11 @@ export interface AuditLog {
   description: string;
   timestamp: string;
 }
+
+export interface DeviceSession {
+  id: string;
+  userAgent: string;
+  lastSeen: string;
+  createdAt: string;
+  isCurrent: boolean;
+}

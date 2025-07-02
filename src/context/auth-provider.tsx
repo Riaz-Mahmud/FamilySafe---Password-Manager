@@ -2,9 +2,11 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { updateSessionLastSeen } from '@/services/firestore';
 
 type AuthContextType = {
   user: User | null;
@@ -18,12 +20,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let unsubscribeSession: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+
+      if (unsubscribeSession) {
+        unsubscribeSession();
+      }
+
+      if (user) {
+        const sessionId = localStorage.getItem('sessionId');
+        if (sessionId) {
+          updateSessionLastSeen(user.uid, sessionId);
+          
+          const sessionRef = doc(db, 'users', user.uid, 'sessions', sessionId);
+          unsubscribeSession = onSnapshot(sessionRef, (doc) => {
+            if (!doc.exists()) {
+              signOut(auth);
+              localStorage.removeItem('sessionId');
+            }
+          });
+        }
+      } else {
+         localStorage.removeItem('sessionId');
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribeAuth();
+        if (unsubscribeSession) {
+            unsubscribeSession();
+        }
+    };
   }, []);
   
   return (

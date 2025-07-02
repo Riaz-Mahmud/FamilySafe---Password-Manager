@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember, AuditLog } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession } from '@/types';
 import {
   collection,
   addDoc,
@@ -45,7 +45,6 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
     callback(credentials);
   }, (error) => {
     console.error("Error fetching credentials:", error);
-    // You could also call the callback with an empty array or handle the error in the UI
     callback([]);
   });
 
@@ -139,4 +138,57 @@ export function getAuditLogs(userId: string, callback: (logs: AuditLog[]) => voi
     });
 
     return unsubscribe;
+}
+
+// --- Device Sessions ---
+
+export async function addDeviceSession(userId: string, userAgent: string): Promise<string> {
+  const sessionsCol = collection(db, 'users', userId, 'sessions');
+  const docRef = await addDoc(sessionsCol, {
+    userAgent,
+    createdAt: serverTimestamp(),
+    lastSeen: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateSessionLastSeen(userId: string, sessionId: string): Promise<void> {
+  if (!userId || !sessionId) return;
+  const sessionRef = doc(db, 'users', userId, 'sessions', sessionId);
+  await updateDoc(sessionRef, { lastSeen: serverTimestamp() }).catch(err => {
+    // This can fail if the doc was just deleted by a revoke action. Ignore.
+  });
+}
+
+export function getDeviceSessions(
+  userId: string,
+  currentSessionId: string | null,
+  callback: (sessions: DeviceSession[]) => void
+): () => void {
+  const sessionsCol = collection(db, 'users', userId, 'sessions');
+  const q = query(sessionsCol, orderBy('lastSeen', 'desc'));
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const sessions = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        userAgent: data.userAgent,
+        createdAt: formatTimestamp(data.createdAt),
+        lastSeen: formatTimestamp(data.lastSeen),
+        isCurrent: doc.id === currentSessionId,
+      } as DeviceSession;
+    });
+    callback(sessions);
+  }, (error) => {
+    console.error("Error fetching device sessions:", error);
+    callback([]);
+  });
+
+  return unsubscribe;
+}
+
+export async function revokeDeviceSession(userId: string, sessionId: string): Promise<void> {
+  const sessionRef = doc(db, 'users', userId, 'sessions', sessionId);
+  await deleteDoc(sessionRef);
 }
