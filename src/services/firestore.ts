@@ -3,7 +3,6 @@ import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember } from '@/types';
 import {
   collection,
-  getDocs,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -12,6 +11,7 @@ import {
   Timestamp,
   query,
   orderBy,
+  onSnapshot,
 } from 'firebase/firestore';
 
 // --- Helpers ---
@@ -24,37 +24,40 @@ function formatTimestamp(timestamp: Timestamp | undefined): string {
 
 // --- Credentials ---
 
-export async function getCredentials(userId: string): Promise<Credential[]> {
+export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
   const q = query(credentialsCol, orderBy('lastModified', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        url: data.url,
-        username: data.username,
-        password: data.password || '',
-        notes: data.notes,
-        lastModified: formatTimestamp(data.lastModified),
-        sharedWith: data.sharedWith || [],
-        icon: data.icon,
-      } as Credential;
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const credentials = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          url: data.url,
+          username: data.username,
+          password: data.password,
+          notes: data.notes,
+          lastModified: formatTimestamp(data.lastModified),
+          sharedWith: data.sharedWith || [],
+          icon: data.icon,
+        } as Credential;
+    });
+    callback(credentials);
+  }, (error) => {
+    console.error("Error fetching credentials:", error);
+    // You could also call the callback with an empty array or handle the error in the UI
+    callback([]);
   });
+
+  return unsubscribe;
 }
 
-export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified'>): Promise<Credential> {
+export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified'>): Promise<void> {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const docRef = await addDoc(credentialsCol, {
+  await addDoc(credentialsCol, {
     ...credential,
     lastModified: serverTimestamp(),
   });
-  const newCredential = {
-    ...credential,
-    id: docRef.id,
-    lastModified: new Date().toLocaleDateString(),
-  };
-  return newCredential;
 }
 
 export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id'>>): Promise<void> {
@@ -72,16 +75,21 @@ export async function deleteCredential(userId: string, id: string): Promise<void
 
 // --- Family Members ---
 
-export async function getFamilyMembers(userId: string): Promise<FamilyMember[]> {
+export function getFamilyMembers(userId: string, callback: (familyMembers: FamilyMember[]) => void): () => void {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
-  const snapshot = await getDocs(familyMembersCol);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyMember));
+  const unsubscribe = onSnapshot(familyMembersCol, (snapshot) => {
+    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyMember));
+    callback(members);
+  }, (error) => {
+    console.error("Error fetching family members:", error);
+    callback([]);
+  });
+  return unsubscribe;
 }
 
-export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id'>): Promise<FamilyMember> {
+export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id'>): Promise<void> {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
-  const docRef = await addDoc(familyMembersCol, member);
-  return { ...member, id: docRef.id };
+  await addDoc(familyMembersCol, member);
 }
 
 export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {

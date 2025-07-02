@@ -86,29 +86,29 @@ export default function DashboardPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    async function loadData() {
-      if (!user) return;
-      setIsDataLoading(true);
-      try {
-        const [creds, members] = await Promise.all([
-          getCredentials(user.uid),
-          getFamilyMembers(user.uid),
-        ]);
-        setCredentials(creds);
-        setFamilyMembers(members);
-      } catch (error) {
-        console.error("Failed to load data from Firestore", error);
-        toast({
-          title: 'Error loading data',
-          description: 'Could not fetch data from the database. Please try again later.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsDataLoading(false);
-      }
+    if (!user?.uid) {
+      setCredentials([]);
+      setFamilyMembers([]);
+      return;
     }
-    loadData();
-  }, [toast, user]);
+
+    setIsDataLoading(true);
+
+    const unsubscribeCredentials = getCredentials(user.uid, (creds) => {
+      setCredentials(creds);
+      setIsDataLoading(false);
+    });
+
+    const unsubscribeFamilyMembers = getFamilyMembers(user.uid, (members) => {
+      setFamilyMembers(members);
+      // You can also turn off loading here if you prefer
+    });
+
+    return () => {
+      unsubscribeCredentials();
+      unsubscribeFamilyMembers();
+    };
+  }, [user?.uid]);
 
   const handleSignOut = async () => {
     await signOutUser();
@@ -118,8 +118,7 @@ export default function DashboardPage() {
   const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
     if(!user) return;
     try {
-      const addedCredential = await addCredential(user.uid, newCredential);
-      setCredentials(prev => [addedCredential, ...prev]);
+      await addCredential(user.uid, newCredential);
       toast({
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
@@ -135,9 +134,6 @@ export default function DashboardPage() {
     try {
       const { id, ...dataToUpdate } = updatedCredential;
       await updateCredential(user.uid, id, dataToUpdate);
-      setCredentials(prev =>
-        prev.map(c => (c.id === updatedCredential.id ? updatedCredential : c))
-      );
       toast({
         title: 'Credential Updated',
         description: 'The credential has been updated successfully.',
@@ -152,7 +148,6 @@ export default function DashboardPage() {
     if (deleteTargetId && user) {
       try {
         await deleteCredential(user.uid, deleteTargetId);
-        setCredentials(prev => prev.filter(c => c.id !== deleteTargetId));
         toast({
           title: 'Credential Deleted',
           description: 'The credential has been permanently deleted.',
@@ -174,8 +169,7 @@ export default function DashboardPage() {
             ...newMember,
             avatar: `https://placehold.co/40x40.png`,
         };
-        const addedMember = await addFamilyMember(user.uid, memberToAdd);
-        setFamilyMembers(prev => [...prev, addedMember]);
+        await addFamilyMember(user.uid, memberToAdd);
         toast({
             title: 'Family Member Added',
             description: `${newMember.name} has been added to your family group.`,
@@ -190,14 +184,12 @@ export default function DashboardPage() {
     if(!user) return;
     try {
         await updateFamilyMember(user.uid, updatedMember.id, updatedMember);
-        setFamilyMembers(prev =>
-            prev.map(m => (m.id === updatedMember.id ? updatedMember : m))
-        );
         toast({
             title: 'Family Member Updated',
             description: 'The member details have been updated successfully.',
         });
-    } catch (error) {
+    } catch (error)
+    {
         console.error("Error updating family member:", error);
         toast({ title: 'Error', description: 'Failed to update family member.', variant: 'destructive' });
     } finally {
@@ -210,7 +202,6 @@ export default function DashboardPage() {
     if (deleteFamilyMemberTargetId && user) {
       try {
           await deleteFamilyMember(user.uid, deleteFamilyMemberTargetId);
-          setFamilyMembers(prev => prev.filter(m => m.id !== deleteFamilyMemberTargetId));
           toast({
               title: 'Family Member Removed',
               description: 'The family member has been removed.',
@@ -275,7 +266,7 @@ export default function DashboardPage() {
     return true;
   });
 
-  if (authLoading || !user) {
+  if (authLoading || (!user && !isDataLoading)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -343,19 +334,21 @@ export default function DashboardPage() {
             </SidebarMenuItem>
           </SidebarMenu>
           <Separator className="my-2" />
-          <div className="flex items-center gap-3 p-2">
-            <Avatar>
-              <AvatarImage data-ai-hint="person" src={user.photoURL || `https://placehold.co/40x40.png`} alt={user.displayName || 'User'} />
-              <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col overflow-hidden">
-              <span className="font-semibold truncate">{user.displayName || 'User'}</span>
-              <span className="text-sm text-muted-foreground truncate">{user.email}</span>
+          {user && (
+            <div className="flex items-center gap-3 p-2">
+              <Avatar>
+                <AvatarImage data-ai-hint="person" src={user.photoURL || `https://placehold.co/40x40.png`} alt={user.displayName || 'User'} />
+                <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col overflow-hidden">
+                <span className="font-semibold truncate">{user.displayName || 'User'}</span>
+                <span className="text-sm text-muted-foreground truncate">{user.email}</span>
+              </div>
+              <Button variant="ghost" size="icon" className="ml-auto" onClick={handleSignOut}>
+                <LogOut />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" className="ml-auto" onClick={handleSignOut}>
-              <LogOut />
-            </Button>
-          </div>
+          )}
         </SidebarFooter>
       </Sidebar>
 
