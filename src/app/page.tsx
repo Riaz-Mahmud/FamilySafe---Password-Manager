@@ -89,19 +89,31 @@ export default function DashboardPage() {
     if (!user?.uid) {
       setCredentials([]);
       setFamilyMembers([]);
+      setIsDataLoading(false);
       return;
     }
 
     setIsDataLoading(true);
+    
+    let credsLoaded = false;
+    let membersLoaded = false;
+
+    const checkDone = () => {
+      if (credsLoaded && membersLoaded) {
+        setIsDataLoading(false);
+      }
+    };
 
     const unsubscribeCredentials = getCredentials(user.uid, (creds) => {
       setCredentials(creds);
-      setIsDataLoading(false);
+      credsLoaded = true;
+      checkDone();
     });
 
     const unsubscribeFamilyMembers = getFamilyMembers(user.uid, (members) => {
       setFamilyMembers(members);
-      // You can also turn off loading here if you prefer
+      membersLoaded = true;
+      checkDone();
     });
 
     return () => {
@@ -266,7 +278,7 @@ export default function DashboardPage() {
     return true;
   });
 
-  if (authLoading || (!user && !isDataLoading)) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -473,3 +485,5 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
+
+    
