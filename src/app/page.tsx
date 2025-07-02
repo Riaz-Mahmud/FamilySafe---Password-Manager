@@ -62,7 +62,7 @@ import { useAuth } from '@/context/auth-provider';
 import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
-import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
+import { sendCredentialEmail, type SendCredentialEmailOutput } from '@/ai/flows/send-credential-email-flow';
 import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 
 
@@ -82,6 +82,7 @@ export default function DashboardPage() {
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
+  const [sentEmailData, setSentEmailData] = useState<Pick<SendCredentialEmailOutput, 'emailSubject' | 'emailBody'> | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -192,18 +193,15 @@ export default function DashboardPage() {
         password: credential.password,
       });
       if (result.success) {
-        toast({
-          title: 'Email Sent',
-          description: result.message,
-        });
+        setSentEmailData({ emailSubject: result.emailSubject, emailBody: result.emailBody });
       } else {
-        throw new Error(result.message);
+        throw new Error(result.message || 'Failed to generate email content.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending email:', error);
       toast({
         title: 'Error',
-        description: 'Failed to send credential email.',
+        description: error.message || 'Failed to generate credential email.',
         variant: 'destructive',
       });
     } finally {
@@ -524,6 +522,34 @@ export default function DashboardPage() {
             <AlertDialogCancel onClick={() => setDeleteFamilyMemberTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteFamilyMember} className="bg-destructive hover:bg-destructive/90">
               Remove Member
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!sentEmailData} onOpenChange={(open) => !open && setSentEmailData(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Email Simulation</AlertDialogTitle>
+            <AlertDialogDescription>
+              This is a simulation. In a real application, the following email would be sent to the selected recipients. No email has actually been sent.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-4">
+            <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Subject:</h4>
+                <p className="text-sm p-3 bg-secondary rounded-md border">{sentEmailData?.emailSubject}</p>
+            </div>
+            <div className="space-y-1">
+                <h4 className="text-sm font-semibold">Body:</h4>
+                <div className="text-sm p-3 bg-secondary rounded-md border whitespace-pre-wrap">
+                    {sentEmailData?.emailBody}
+                </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setSentEmailData(null)}>
+              Close
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
