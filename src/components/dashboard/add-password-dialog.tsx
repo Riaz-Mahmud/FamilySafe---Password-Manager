@@ -56,18 +56,23 @@ type AddPasswordDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddCredential: (credential: Omit<Credential, 'id' | 'lastModified'>) => void;
+  onUpdateCredential: (credential: Credential) => void;
   familyMembers: FamilyMember[];
+  credentialToEdit: Credential | null;
 };
 
 export function AddPasswordDialog({
   open,
   onOpenChange,
   onAddCredential,
+  onUpdateCredential,
   familyMembers,
+  credentialToEdit,
 }: AddPasswordDialogProps) {
   const [strengthResult, setStrengthResult] =
     useState<PasswordStrengthOutput | null>(null);
   const [isLoadingStrength, setIsLoadingStrength] = useState(false);
+  const isEditing = !!credentialToEdit;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -116,8 +121,32 @@ export function AddPasswordDialog({
   const debouncedCheckStrength = useCallback(debounce(checkStrength, 500), []);
 
   useEffect(() => {
-    debouncedCheckStrength(password);
-  }, [password, debouncedCheckStrength]);
+    if (open) {
+      if (credentialToEdit) {
+        form.reset({
+          url: credentialToEdit.url,
+          username: credentialToEdit.username,
+          password: credentialToEdit.password || '',
+          notes: credentialToEdit.notes,
+          sharedWith: credentialToEdit.sharedWith,
+        });
+        if (credentialToEdit.password) {
+          debouncedCheckStrength(credentialToEdit.password);
+        } else {
+          setStrengthResult(null);
+        }
+      } else {
+        form.reset({
+          url: '',
+          username: '',
+          password: '',
+          notes: '',
+          sharedWith: [],
+        });
+        setStrengthResult(null);
+      }
+    }
+  }, [open, credentialToEdit, form, debouncedCheckStrength]);
 
   const getStrengthStyle = () => {
     if (!strengthResult?.strength) return { color: 'hsl(var(--muted))', value: 0 };
@@ -135,16 +164,24 @@ export function AddPasswordDialog({
   const { color: strengthColor, value: strengthValue } = getStrengthStyle();
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    onAddCredential({
-      url: values.url,
-      username: values.username,
-      password: values.password,
-      notes: values.notes || '',
-      icon: Users, // Placeholder icon
-      sharedWith: values.sharedWith || [],
-    });
-    form.reset();
-    setStrengthResult(null);
+    if (credentialToEdit) {
+      onUpdateCredential({
+        ...credentialToEdit,
+        ...values,
+        notes: values.notes || '',
+        sharedWith: values.sharedWith || [],
+        lastModified: new Date().toLocaleDateString(),
+      });
+    } else {
+      onAddCredential({
+        url: values.url,
+        username: values.username,
+        password: values.password,
+        notes: values.notes || '',
+        icon: Users, // Placeholder icon
+        sharedWith: values.sharedWith || [],
+      });
+    }
     onOpenChange(false);
   }
 
@@ -152,9 +189,11 @@ export function AddPasswordDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle className="font-headline">Add a New Credential</DialogTitle>
+          <DialogTitle className="font-headline">{isEditing ? 'Edit Credential' : 'Add a New Credential'}</DialogTitle>
           <DialogDescription>
-            Enter the details for the new password you want to save.
+            {isEditing
+              ? 'Update the details for this credential.'
+              : 'Enter the details for the new password you want to save.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -308,7 +347,7 @@ export function AddPasswordDialog({
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Save Credential</Button>
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Save Credential'}</Button>
             </DialogFooter>
           </form>
         </Form>

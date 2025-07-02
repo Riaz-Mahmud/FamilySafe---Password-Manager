@@ -30,9 +30,11 @@ import type { Credential, FamilyMember } from '@/types';
 type PasswordListProps = {
   credentials: Credential[];
   familyMembers: FamilyMember[];
+  onEdit: (credential: Credential) => void;
+  onDelete: (id: string) => void;
 };
 
-export function PasswordList({ credentials, familyMembers }: PasswordListProps) {
+export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: PasswordListProps) {
   const { toast } = useToast();
 
   const handleCopy = (text: string, field: string) => {
@@ -150,13 +152,16 @@ export function PasswordList({ credentials, familyMembers }: PasswordListProps) 
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
+                            <DropdownMenuItem onClick={() => onEdit(credential)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => onDelete(credential.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                         </DropdownMenu>

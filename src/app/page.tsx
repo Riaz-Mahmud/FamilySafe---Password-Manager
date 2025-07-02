@@ -32,6 +32,17 @@ import type { Credential, FamilyMember } from '@/types';
 import { mockCredentials, mockFamilyMembers } from '@/data/mock';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const [credentials, setCredentials] = useState<Credential[]>(mockCredentials);
@@ -39,14 +50,60 @@ export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('All Passwords');
+  const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleAddCredential = (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
     const credentialToAdd: Credential = {
       ...newCredential,
-      id: (credentials.length + 1).toString(),
+      id: Date.now().toString(),
       lastModified: new Date().toLocaleDateString(),
     };
     setCredentials(prev => [credentialToAdd, ...prev]);
+    toast({
+      title: 'Credential Added',
+      description: 'The new credential has been saved successfully.',
+    });
+  };
+
+  const handleUpdateCredential = (updatedCredential: Credential) => {
+    setCredentials(prev =>
+      prev.map(c => (c.id === updatedCredential.id ? updatedCredential : c))
+    );
+    toast({
+      title: 'Credential Updated',
+      description: 'The credential has been updated successfully.',
+    });
+  };
+
+  const handleDeleteCredential = () => {
+    if (deleteTargetId) {
+      setCredentials(prev => prev.filter(c => c.id !== deleteTargetId));
+      toast({
+        title: 'Credential Deleted',
+        description: 'The credential has been permanently deleted.',
+        variant: 'destructive',
+      });
+      setDeleteTargetId(null);
+    }
+  };
+
+  const openAddDialog = () => {
+    setEditingCredential(null);
+    setAddDialogOpen(true);
+  };
+
+  const openEditDialog = (credential: Credential) => {
+    setEditingCredential(credential);
+    setAddDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    if (!open) {
+      setEditingCredential(null);
+    }
+    setAddDialogOpen(open);
   };
 
   const filteredCredentials = credentials.filter(c =>
@@ -143,7 +200,7 @@ export default function DashboardPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={() => setAddDialogOpen(true)} className="font-semibold">
+            <Button onClick={openAddDialog} className="font-semibold">
               <Plus className="mr-2 h-5 w-5" />
               Add Credential
             </Button>
@@ -151,17 +208,43 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
-            <PasswordList credentials={filteredCredentials} familyMembers={familyMembers} />
+            <PasswordList
+              credentials={filteredCredentials}
+              familyMembers={familyMembers}
+              onEdit={openEditDialog}
+              onDelete={setDeleteTargetId}
+            />
           </main>
         </div>
       </SidebarInset>
 
       <AddPasswordDialog
         open={isAddDialogOpen}
-        onOpenChange={setAddDialogOpen}
+        onOpenChange={handleDialogChange}
         onAddCredential={handleAddCredential}
+        onUpdateCredential={handleUpdateCredential}
         familyMembers={familyMembers}
+        credentialToEdit={editingCredential}
       />
+      
+      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this
+              credential and remove it from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTargetId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCredential} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </SidebarProvider>
   );
 }
