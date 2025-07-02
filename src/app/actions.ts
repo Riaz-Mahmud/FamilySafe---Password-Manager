@@ -59,6 +59,32 @@ The FamilySafe Team`;
     };
   } catch (error: any) {
     console.error('Error in sendCredentialEmailAction:', error);
+
+    // Provide more specific feedback for common SendGrid errors.
+    if (error.response) {
+      const sendGridErrorBody = error.response.body;
+      if (sendGridErrorBody && sendGridErrorBody.errors && sendGridErrorBody.errors.length > 0) {
+        const firstError = sendGridErrorBody.errors[0];
+        if (firstError.message.includes('authorization')) {
+           return { 
+              success: false, 
+              message: 'SendGrid Authorization Failed: Please check if your SENDGRID_API_KEY is correct and has the required permissions.' 
+           };
+        }
+        if (firstError.message.includes('does not match a verified Sender Identity')) {
+           return { 
+              success: false, 
+              message: 'SendGrid Sender Error: The "from" email address has not been verified in your SendGrid account. Please complete sender verification.'
+           };
+        }
+        // Return the first specific error message from SendGrid
+        return {
+           success: false,
+           message: `SendGrid Error: ${firstError.message}`
+        };
+      }
+    }
+    
     return { 
       success: false, 
       message: 'An unexpected error occurred while sending the email. Please check the server logs for more details.' 
