@@ -33,13 +33,19 @@ type AddFamilyMemberDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddFamilyMember: (member: Omit<FamilyMember, 'id' | 'avatar'>) => void;
+  onUpdateFamilyMember: (member: FamilyMember) => void;
+  familyMemberToEdit: FamilyMember | null;
 };
 
 export function AddFamilyMemberDialog({
   open,
   onOpenChange,
   onAddFamilyMember,
+  onUpdateFamilyMember,
+  familyMemberToEdit,
 }: AddFamilyMemberDialogProps) {
+  const isEditing = !!familyMemberToEdit;
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -50,15 +56,30 @@ export function AddFamilyMemberDialog({
 
   useEffect(() => {
     if (open) {
-      form.reset({
-        name: '',
-        email: '',
-      });
+      if (familyMemberToEdit) {
+        form.reset({
+          name: familyMemberToEdit.name,
+          email: familyMemberToEdit.email,
+        });
+      } else {
+        form.reset({
+          name: '',
+          email: '',
+        });
+      }
     }
-  }, [open, form]);
+  }, [open, familyMemberToEdit, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    onAddFamilyMember({ name: values.name });
+    if (isEditing && familyMemberToEdit) {
+      onUpdateFamilyMember({
+        ...familyMemberToEdit,
+        name: values.name,
+        email: values.email,
+      });
+    } else {
+      onAddFamilyMember({ name: values.name, email: values.email });
+    }
     onOpenChange(false);
   }
 
@@ -66,9 +87,11 @@ export function AddFamilyMemberDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="font-headline">Add Family Member</DialogTitle>
+          <DialogTitle className="font-headline">{isEditing ? 'Edit Family Member' : 'Add Family Member'}</DialogTitle>
           <DialogDescription>
-            Invite a new member to your family group by email. They will be able to access shared passwords.
+            {isEditing
+              ? "Update the family member's details."
+              : 'Invite a new member to your family group by email. They will be able to access shared passwords.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -103,7 +126,7 @@ export function AddFamilyMemberDialog({
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">Send Invite</Button>
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Send Invite'}</Button>
             </DialogFooter>
           </form>
         </Form>

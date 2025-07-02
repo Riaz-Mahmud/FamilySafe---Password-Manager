@@ -38,16 +38,19 @@ export const mockFamilyMembers: FamilyMember[] = [
   {
     id: '1',
     name: 'Alice',
+    email: 'alice@familysafe.com',
     avatar: 'https://placehold.co/40x40/b19cd9/121212.png',
   },
   {
     id: '2',
     name: 'Bob',
+    email: 'bob@familysafe.com',
     avatar: 'https://placehold.co/40x40/6a49bd/FFFFFF.png',
   },
   {
     id: '3',
     name: 'Charlie',
+    email: 'charlie@familysafe.com',
     avatar: 'https://placehold.co/40x40/FFFFFF/121212.png',
   },
 ];

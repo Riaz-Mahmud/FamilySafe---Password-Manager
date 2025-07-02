@@ -12,5 +12,6 @@ export interface Credential {
 export interface FamilyMember {
   id: string;
   name: string;
+  email: string;
   avatar: string; // URL to avatar image
 }

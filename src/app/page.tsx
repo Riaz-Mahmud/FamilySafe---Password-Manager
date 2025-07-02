@@ -55,6 +55,8 @@ export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
+  const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleAddCredential = (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
@@ -105,6 +107,30 @@ export default function DashboardPage() {
     });
   };
 
+  const handleUpdateFamilyMember = (updatedMember: FamilyMember) => {
+    setFamilyMembers(prev =>
+      prev.map(m => (m.id === updatedMember.id ? updatedMember : m))
+    );
+    setEditingFamilyMember(null);
+    setAddFamilyMemberDialogOpen(false);
+    toast({
+      title: 'Family Member Updated',
+      description: 'The member details have been updated successfully.',
+    });
+  };
+
+  const handleDeleteFamilyMember = () => {
+    if (deleteFamilyMemberTargetId) {
+      setFamilyMembers(prev => prev.filter(m => m.id !== deleteFamilyMemberTargetId));
+      toast({
+        title: 'Family Member Removed',
+        description: 'The family member has been removed.',
+        variant: 'destructive',
+      });
+      setDeleteFamilyMemberTargetId(null);
+    }
+  };
+
   const openAddDialog = () => {
     setEditingCredential(null);
     setAddDialogOpen(true);
@@ -120,6 +146,23 @@ export default function DashboardPage() {
       setEditingCredential(null);
     }
     setAddDialogOpen(open);
+  };
+
+  const openAddFamilyMemberDialog = () => {
+    setEditingFamilyMember(null);
+    setAddFamilyMemberDialogOpen(true);
+  };
+
+  const openEditFamilyMemberDialog = (member: FamilyMember) => {
+    setEditingFamilyMember(member);
+    setAddFamilyMemberDialogOpen(true);
+  };
+
+  const handleFamilyDialogChange = (open: boolean) => {
+    if (!open) {
+      setEditingFamilyMember(null);
+    }
+    setAddFamilyMemberDialogOpen(open);
   };
 
   const filteredCredentials = credentials.filter(credential => {
@@ -240,7 +283,7 @@ export default function DashboardPage() {
             ) : activeMenu === 'Family Members' ? (
               <>
                 <div className="flex-1" />
-                <Button onClick={() => setAddFamilyMemberDialogOpen(true)} className="font-semibold">
+                <Button onClick={openAddFamilyMemberDialog} className="font-semibold">
                   <Plus className="mr-2 h-5 w-5" />
                   Add Family Member
                 </Button>
@@ -251,7 +294,11 @@ export default function DashboardPage() {
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
             {activeMenu === 'Family Members' ? (
-              <FamilyMembersList familyMembers={familyMembers} />
+              <FamilyMembersList
+                familyMembers={familyMembers}
+                onEdit={openEditFamilyMemberDialog}
+                onDelete={setDeleteFamilyMemberTargetId}
+              />
             ) : (activeMenu === 'All Passwords' || activeMenu === 'My Passwords') ? (
               <PasswordList
                 credentials={filteredCredentials}
@@ -279,8 +326,10 @@ export default function DashboardPage() {
 
       <AddFamilyMemberDialog
         open={isAddFamilyMemberDialogOpen}
-        onOpenChange={setAddFamilyMemberDialogOpen}
+        onOpenChange={handleFamilyDialogChange}
         onAddFamilyMember={handleAddFamilyMember}
+        onUpdateFamilyMember={handleUpdateFamilyMember}
+        familyMemberToEdit={editingFamilyMember}
       />
       
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
@@ -296,6 +345,23 @@ export default function DashboardPage() {
             <AlertDialogCancel onClick={() => setDeleteTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteCredential} className="bg-destructive hover:bg-destructive/90">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteFamilyMemberTargetId} onOpenChange={(open) => !open && setDeleteFamilyMemberTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the family member from your group. They will lose access to all shared passwords. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteFamilyMemberTargetId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFamilyMember} className="bg-destructive hover:bg-destructive/90">
+              Remove Member
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
