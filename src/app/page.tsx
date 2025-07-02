@@ -70,7 +70,7 @@ import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
 import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
-import { SecurityHealthPage } from '@/components/dashboard/security-health-page';
+import { PasswordHealthReportPage } from '@/components/dashboard/security-health-page';
 import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 
@@ -385,8 +385,8 @@ export default function DashboardPage() {
             onDelete={setDeleteFamilyMemberTargetId}
           />
         );
-      case 'Security Health':
-        return <SecurityHealthPage credentials={credentials} onEditCredential={openEditDialog} />;
+      case 'Password Health Report':
+        return <PasswordHealthReportPage credentials={credentials} onEditCredential={openEditDialog} />;
       case 'Audit Logs':
         return <AuditLogsPage logs={auditLogs} />;
       case 'Device Management':
@@ -441,12 +441,12 @@ export default function DashboardPage() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Security Health')}
-                isActive={activeMenu === 'Security Health'}
-                tooltip="Security Health"
+                onClick={() => setActiveMenu('Password Health Report')}
+                isActive={activeMenu === 'Password Health Report'}
+                tooltip="Password Health Report"
               >
                 <ShieldCheck />
-                Security Health
+                Password Health Report
               </SidebarMenuButton>
             </SidebarMenuItem>
              <SidebarMenuItem>

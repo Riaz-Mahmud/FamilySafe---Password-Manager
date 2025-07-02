@@ -15,12 +15,12 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
-type SecurityHealthPageProps = {
+type PasswordHealthReportPageProps = {
     credentials: Credential[];
     onEditCredential: (credential: Credential) => void;
 };
 
-export function SecurityHealthPage({ credentials, onEditCredential }: SecurityHealthPageProps) {
+export function PasswordHealthReportPage({ credentials, onEditCredential }: PasswordHealthReportPageProps) {
   const [report, setReport] = useState<SecurityReport | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -50,9 +50,9 @@ export function SecurityHealthPage({ credentials, onEditCredential }: SecurityHe
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Security Health Check</CardTitle>
+          <CardTitle>Password Health Report</CardTitle>
           <CardDescription>
-            Scan your saved credentials for vulnerabilities like data breaches, reused passwords, and weak passwords.
+            Check for weak, reused, or compromised passwords to improve your security score.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
@@ -61,7 +61,7 @@ export function SecurityHealthPage({ credentials, onEditCredential }: SecurityHe
           </p>
           <Button onClick={handleStartScan} disabled={isScanning || credentials.length === 0} size="lg">
             {isScanning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isScanning ? 'Scanning...' : 'Start Security Scan'}
+            {isScanning ? 'Scanning...' : 'Run Password Health Check'}
           </Button>
           {credentials.length === 0 && (
             <p className="text-sm text-center text-muted-foreground mt-2">
@@ -91,7 +91,7 @@ export function SecurityHealthPage({ credentials, onEditCredential }: SecurityHe
               <div className="flex justify-center mb-2">
                 {healthScore > 80 ? <ShieldCheck className="h-16 w-16 text-green-500" /> : <ShieldAlert className="h-16 w-16 text-destructive" />}
               </div>
-              <CardTitle>Security Score: {Math.round(healthScore)}%</CardTitle>
+              <CardTitle>Password Health Score: {Math.round(healthScore)}%</CardTitle>
               <CardDescription>
                 {totalIssues === 0 ? "Great job! No security issues found." : `Found ${totalIssues} potential issues.`}
               </CardDescription>
