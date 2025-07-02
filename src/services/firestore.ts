@@ -13,6 +13,7 @@ import {
   orderBy,
   onSnapshot,
 } from 'firebase/firestore';
+import { encryptData, decryptData } from '@/lib/crypto';
 
 // --- Helpers ---
 
@@ -34,9 +35,9 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
         return {
           id: doc.id,
           url: data.url,
-          username: data.username,
-          password: data.password,
-          notes: data.notes,
+          username: decryptData(data.username, userId),
+          password: decryptData(data.password, userId),
+          notes: decryptData(data.notes, userId),
           lastModified: formatTimestamp(data.lastModified),
           sharedWith: data.sharedWith || [],
           icon: data.icon,
@@ -53,16 +54,34 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
 
 export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified'>): Promise<void> {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  await addDoc(credentialsCol, {
+  
+  const encryptedCredential = {
     ...credential,
+    username: encryptData(credential.username, userId),
+    password: encryptData(credential.password, userId),
+    notes: encryptData(credential.notes || '', userId),
     lastModified: serverTimestamp(),
-  });
+  };
+
+  await addDoc(credentialsCol, encryptedCredential);
 }
 
 export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
+  
+  const encryptedUpdate: { [key: string]: any } = { ...credential };
+  if (credential.username) {
+    encryptedUpdate.username = encryptData(credential.username, userId);
+  }
+  if (credential.password) {
+    encryptedUpdate.password = encryptData(credential.password, userId);
+  }
+  if (credential.hasOwnProperty('notes')) {
+    encryptedUpdate.notes = encryptData(credential.notes || '', userId);
+  }
+
   await updateDoc(docRef, {
-      ...credential,
+      ...encryptedUpdate,
       lastModified: serverTimestamp(),
   });
 }
