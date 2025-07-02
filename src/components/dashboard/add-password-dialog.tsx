@@ -41,6 +41,7 @@ import type { FamilyMember, Credential } from '@/types';
 import { Check, ChevronsUpDown, X, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -68,6 +69,7 @@ export function AddPasswordDialog({
   credentialToEdit,
 }: AddPasswordDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -172,32 +174,32 @@ export function AddPasswordDialog({
                 <FormItem>
                   <FormLabel>Password</FormLabel>
                    <div className="relative">
-                    <FormControl>
-                      <Input
-                        type={showPassword ? 'text' : 'password'}
-                        {...field}
-                        className="pr-10"
-                      />
-                    </FormControl>
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
-                       <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                        <span className="sr-only">
-                          {showPassword ? 'Hide password' : 'Show password'}
-                        </span>
-                      </Button>
-                    </div>
+                      <FormControl>
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          {...field}
+                          className="pr-10"
+                        />
+                      </FormControl>
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
+                         <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setShowPassword(!showPassword)}
+                          tabIndex={-1}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                          <span className="sr-only">
+                            {showPassword ? 'Hide password' : 'Show password'}
+                          </span>
+                        </Button>
+                      </div>
                   </div>
                   <FormMessage />
                 </FormItem>
