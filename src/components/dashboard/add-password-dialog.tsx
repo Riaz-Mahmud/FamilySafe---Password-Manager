@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -41,7 +42,7 @@ import { checkPasswordStrength } from '@/ai/flows/password-strength-checker';
 import { generatePassword } from '@/ai/flows/generate-password-flow';
 import type { PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
 import type { FamilyMember, Credential } from '@/types';
-import { Check, ChevronsUpDown, Loader2, Info, Users, X, Wand2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Info, Users, X, Wand2, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -76,6 +77,7 @@ export function AddPasswordDialog({
     useState<PasswordStrengthOutput | null>(null);
   const [isLoadingStrength, setIsLoadingStrength] = useState(false);
   const [isGeneratingPassword, setIsGeneratingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
@@ -131,6 +133,7 @@ export function AddPasswordDialog({
 
   useEffect(() => {
     if (open) {
+      setShowPassword(false);
       if (credentialToEdit) {
         form.reset({
           url: credentialToEdit.url,
@@ -260,25 +263,47 @@ export function AddPasswordDialog({
                   <FormLabel>Password</FormLabel>
                    <div className="relative">
                     <FormControl>
-                      <Input type="password" {...field} className="pr-[110px]" />
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        {...field}
+                        className="pr-[154px]"
+                      />
                     </FormControl>
-                     <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2"
-                      onClick={handleGeneratePassword}
-                      disabled={isLoadingStrength || isGeneratingPassword}
-                    >
-                      {isGeneratingPassword ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Wand2 className="mr-2 h-4 w-4" />
-                          Generate
-                        </>
-                      )}
-                    </Button>
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setShowPassword(!showPassword)}
+                        tabIndex={-1}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        <span className="sr-only">
+                          {showPassword ? 'Hide password' : 'Show password'}
+                        </span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGeneratePassword}
+                        disabled={isLoadingStrength || isGeneratingPassword}
+                      >
+                        {isGeneratingPassword ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Wand2 className="mr-2 h-4 w-4" />
+                            Generate
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                   <div className="pt-2 space-y-2">
                     <div className="flex items-center gap-2">
