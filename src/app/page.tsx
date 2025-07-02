@@ -62,6 +62,7 @@ import { useAuth } from '@/context/auth-provider';
 import { signOutUser } from '@/services/auth';
 import { SettingsPage } from '@/components/dashboard/settings-page';
 import { SupportPage } from '@/components/dashboard/support-page';
+import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 
 
 export default function DashboardPage() {
@@ -79,6 +80,8 @@ export default function DashboardPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
+  const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
+  const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -263,6 +266,11 @@ export default function DashboardPage() {
     }
     setAddFamilyMemberDialogOpen(open);
   };
+  
+  const openSendEmailDialog = (credential: Credential) => {
+    setCredentialToSend(credential);
+    setSendEmailDialogOpen(true);
+  };
 
   const filteredCredentials = credentials.filter(credential => {
     const searchMatch =
@@ -420,6 +428,7 @@ export default function DashboardPage() {
                     familyMembers={familyMembers}
                     onEdit={openEditDialog}
                     onDelete={setDeleteTargetId}
+                    onSend={openSendEmailDialog}
                   />
                 ) : activeMenu === 'Settings' ? (
                   <SettingsPage />
@@ -447,6 +456,14 @@ export default function DashboardPage() {
         onAddFamilyMember={handleAddFamilyMember}
         onUpdateFamilyMember={handleUpdateFamilyMember}
         familyMemberToEdit={editingFamilyMember}
+      />
+
+      <SendEmailDialog
+        open={isSendEmailDialogOpen}
+        onOpenChange={setSendEmailDialogOpen}
+        credential={credentialToSend}
+        familyMembers={familyMembers}
+        user={user}
       />
       
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>

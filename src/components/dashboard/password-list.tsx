@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
 
 type PasswordListProps = {
@@ -34,6 +34,7 @@ type PasswordListProps = {
   familyMembers: FamilyMember[];
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
+  onSend: (credential: Credential) => void;
 };
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -42,7 +43,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   Bot,
 };
 
-export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: PasswordListProps) {
+export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend }: PasswordListProps) {
   const { toast } = useToast();
 
   const handleCopy = (text: string, field: string) => {
@@ -165,6 +166,10 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: P
                             <DropdownMenuItem onClick={() => onEdit(credential)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onSend(credential)}>
+                              <Mail className="mr-2 h-4 w-4" />
+                              Send Email
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem

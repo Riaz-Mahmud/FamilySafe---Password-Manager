@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,6 +17,7 @@ import type { Credential, FamilyMember } from '@/types';
 import type { User } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { sendCredentialEmailAction } from '@/app/actions';
 
 type SendEmailDialogProps = {
   open: boolean;
@@ -23,7 +25,6 @@ type SendEmailDialogProps = {
   credential: Credential | null;
   familyMembers: FamilyMember[];
   user: User | null;
-  onSendEmail: (emails: string[], credential: Credential) => Promise<void>;
 };
 
 export function SendEmailDialog({
@@ -32,7 +33,6 @@ export function SendEmailDialog({
   credential,
   familyMembers,
   user,
-  onSendEmail,
 }: SendEmailDialogProps) {
   const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -61,7 +61,26 @@ export function SendEmailDialog({
       return;
     }
     setIsSending(true);
-    await onSendEmail(selectedEmails, credential);
+    const result = await sendCredentialEmailAction({
+      emails: selectedEmails,
+      url: credential.url,
+      username: credential.username,
+      password: credential.password,
+    });
+    
+    if (result.success) {
+      toast({
+        title: 'Email Sent',
+        description: result.message,
+      });
+    } else {
+        toast({
+            title: 'Error Sending Email',
+            description: result.message,
+            variant: 'destructive',
+        });
+    }
+
     setIsSending(false);
     onOpenChange(false);
   };
@@ -71,6 +90,9 @@ export function SendEmailDialog({
   const sharedWithMembers = familyMembers.filter((member) =>
     credential.sharedWith.includes(member.id)
   );
+  
+  const allPossibleRecipients = (user?.email ? [user.email] : []).concat(sharedWithMembers.map(m => m.email));
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,37 +105,39 @@ export function SendEmailDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <p className="text-sm">
-            <strong>URL:</strong> {credential.url}
-            <br />
-            <strong>Username:</strong> {credential.username}
-          </p>
           <div className="space-y-2">
             <h4 className="font-medium text-sm">Recipients</h4>
-            {user?.email && (
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id={user.email}
-                  onCheckedChange={(checked) => handleEmailSelection(user.email!, !!checked)}
-                  checked={selectedEmails.includes(user.email)}
-                />
-                <Label htmlFor={user.email} className="font-normal">
-                  {user.email} (You)
-                </Label>
-              </div>
+            {allPossibleRecipients.length > 0 ? (
+                <>
+                {user?.email && (
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                    id={user.email}
+                    onCheckedChange={(checked) => handleEmailSelection(user.email!, !!checked)}
+                    checked={selectedEmails.includes(user.email)}
+                    />
+                    <Label htmlFor={user.email} className="font-normal">
+                    {user.email} (You)
+                    </Label>
+                </div>
+                )}
+                {sharedWithMembers.map((member) => (
+                <div key={member.id} className="flex items-center space-x-2">
+                    <Checkbox
+                    id={member.id}
+                    onCheckedChange={(checked) => handleEmailSelection(member.email, !!checked)}
+                    checked={selectedEmails.includes(member.email)}
+                    />
+                    <Label htmlFor={member.id} className="font-normal">
+                    {member.email} ({member.name})
+                    </Label>
+                </div>
+                ))}
+            </>
+            ) : (
+                <p className="text-sm text-muted-foreground">No recipients available. Share this password with a family member to be able to email them.</p>
             )}
-            {sharedWithMembers.map((member) => (
-              <div key={member.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={member.id}
-                  onCheckedChange={(checked) => handleEmailSelection(member.email, !!checked)}
-                  checked={selectedEmails.includes(member.email)}
-                />
-                <Label htmlFor={member.id} className="font-normal">
-                  {member.email} ({member.name})
-                </Label>
-              </div>
-            ))}
+            
           </div>
         </div>
         <DialogFooter>
