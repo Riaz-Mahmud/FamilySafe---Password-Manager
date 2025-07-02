@@ -16,13 +16,17 @@ export function middleware(request: NextRequest) {
   // If you find redirection not working, this part may need adjustment based on your full auth flow.
   const session = request.cookies.get('firebase-session-cookie-placeholder')?.value;
 
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL('/login', request.nextUrl));
-  }
+  // The logic below is commented out because it relies on a session cookie that isn't implemented
+  // in this purely client-side authentication setup. This was causing a redirect loop.
+  // Client-side routing protection is handled in the components themselves.
 
-  if (session && publicRoutes.includes(path)) {
-     return NextResponse.redirect(new URL('/', request.nextUrl));
-  }
+  // if (isProtectedRoute && !session) {
+  //   return NextResponse.redirect(new URL('/login', request.nextUrl));
+  // }
+
+  // if (session && publicRoutes.includes(path)) {
+  //    return NextResponse.redirect(new URL('/', request.nextUrl));
+  // }
 
   return NextResponse.next();
 }

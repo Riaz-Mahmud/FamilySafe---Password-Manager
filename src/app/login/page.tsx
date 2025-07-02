@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Logo } from '@/components/logo';
 import { signIn, signInWithGoogle } from '@/services/auth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/context/auth-provider';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,13 +20,20 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/');
+    }
+  }, [user, authLoading, router]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       await signIn(email, password);
-      router.push('/');
+      router.replace('/');
     } catch (error: any) {
       toast({
         title: 'Login Failed',
@@ -41,7 +49,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      router.push('/');
+      router.replace('/');
     } catch (error: any) {
        toast({
         title: 'Google Sign-In Failed',
@@ -51,6 +59,14 @@ export default function LoginPage() {
     } finally {
         setIsLoading(false);
     }
+  }
+
+  if (authLoading || user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
