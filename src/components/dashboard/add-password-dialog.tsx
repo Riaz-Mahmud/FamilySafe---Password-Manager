@@ -121,6 +121,10 @@ export function AddPasswordDialog({
   const debouncedCheckStrength = useCallback(debounce(checkStrength, 500), []);
 
   useEffect(() => {
+    debouncedCheckStrength(password);
+  }, [password, debouncedCheckStrength]);
+
+  useEffect(() => {
     if (open) {
       if (credentialToEdit) {
         form.reset({
@@ -178,7 +182,7 @@ export function AddPasswordDialog({
         username: values.username,
         password: values.password,
         notes: values.notes || '',
-        icon: Users, // Placeholder icon
+        icon: 'Globe', // Default icon
         sharedWith: values.sharedWith || [],
       });
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -22,6 +22,7 @@ import {
   Search,
   LogOut,
   LifeBuoy,
+  KeyRound,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,6 @@ import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
 import type { Credential, FamilyMember } from '@/types';
-import { mockCredentials, mockFamilyMembers } from '@/data/mock';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -45,10 +45,23 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { AddFamilyMemberDialog } from '@/components/dashboard/add-family-member-dialog';
+import {
+  getCredentials,
+  addCredential,
+  updateCredential,
+  deleteCredential,
+  getFamilyMembers,
+  addFamilyMember,
+  updateFamilyMember,
+  deleteFamilyMember,
+} from '@/services/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function DashboardPage() {
-  const [credentials, setCredentials] = useState<Credential[]>(mockCredentials);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(mockFamilyMembers);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
@@ -59,75 +72,133 @@ export default function DashboardPage() {
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleAddCredential = (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
-    const credentialToAdd: Credential = {
-      ...newCredential,
-      id: Date.now().toString(),
-      lastModified: new Date().toLocaleDateString(),
-    };
-    setCredentials(prev => [credentialToAdd, ...prev]);
-    toast({
-      title: 'Credential Added',
-      description: 'The new credential has been saved successfully.',
-    });
-  };
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [creds, members] = await Promise.all([
+          getCredentials(),
+          getFamilyMembers(),
+        ]);
+        setCredentials(creds);
+        setFamilyMembers(members);
+      } catch (error) {
+        console.error("Failed to load data from Firestore", error);
+        toast({
+          title: 'Error loading data',
+          description: 'Could not fetch data from the database. Please try again later.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, [toast]);
 
-  const handleUpdateCredential = (updatedCredential: Credential) => {
-    setCredentials(prev =>
-      prev.map(c => (c.id === updatedCredential.id ? updatedCredential : c))
-    );
-    toast({
-      title: 'Credential Updated',
-      description: 'The credential has been updated successfully.',
-    });
-  };
-
-  const handleDeleteCredential = () => {
-    if (deleteTargetId) {
-      setCredentials(prev => prev.filter(c => c.id !== deleteTargetId));
+  const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
+    try {
+      const addedCredential = await addCredential(newCredential);
+      setCredentials(prev => [addedCredential, ...prev].sort((a,b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()));
       toast({
-        title: 'Credential Deleted',
-        description: 'The credential has been permanently deleted.',
-        variant: 'destructive',
+        title: 'Credential Added',
+        description: 'The new credential has been saved successfully.',
       });
-      setDeleteTargetId(null);
+    } catch (error) {
+      console.error("Error adding credential:", error);
+      toast({ title: 'Error', description: 'Failed to add credential.', variant: 'destructive' });
     }
   };
 
-  const handleAddFamilyMember = (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
-    const memberToAdd: FamilyMember = {
-      ...newMember,
-      id: Date.now().toString(),
-      avatar: `https://placehold.co/40x40.png`,
-    };
-    setFamilyMembers(prev => [...prev, memberToAdd]);
-    toast({
-      title: 'Family Member Added',
-      description: `${newMember.name} has been invited to your family.`,
-    });
-  };
-
-  const handleUpdateFamilyMember = (updatedMember: FamilyMember) => {
-    setFamilyMembers(prev =>
-      prev.map(m => (m.id === updatedMember.id ? updatedMember : m))
-    );
-    setEditingFamilyMember(null);
-    setAddFamilyMemberDialogOpen(false);
-    toast({
-      title: 'Family Member Updated',
-      description: 'The member details have been updated successfully.',
-    });
-  };
-
-  const handleDeleteFamilyMember = () => {
-    if (deleteFamilyMemberTargetId) {
-      setFamilyMembers(prev => prev.filter(m => m.id !== deleteFamilyMemberTargetId));
+  const handleUpdateCredential = async (updatedCredential: Credential) => {
+    try {
+      const { id, ...dataToUpdate } = updatedCredential;
+      await updateCredential(id, dataToUpdate);
+      setCredentials(prev =>
+        prev.map(c => (c.id === updatedCredential.id ? updatedCredential : c))
+      );
       toast({
-        title: 'Family Member Removed',
-        description: 'The family member has been removed.',
-        variant: 'destructive',
+        title: 'Credential Updated',
+        description: 'The credential has been updated successfully.',
       });
-      setDeleteFamilyMemberTargetId(null);
+    } catch (error) {
+      console.error("Error updating credential:", error);
+      toast({ title: 'Error', description: 'Failed to update credential.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteCredential = async () => {
+    if (deleteTargetId) {
+      try {
+        await deleteCredential(deleteTargetId);
+        setCredentials(prev => prev.filter(c => c.id !== deleteTargetId));
+        toast({
+          title: 'Credential Deleted',
+          description: 'The credential has been permanently deleted.',
+          variant: 'destructive',
+        });
+      } catch (error) {
+        console.error("Error deleting credential:", error);
+        toast({ title: 'Error', description: 'Failed to delete credential.', variant: 'destructive' });
+      } finally {
+        setDeleteTargetId(null);
+      }
+    }
+  };
+
+  const handleAddFamilyMember = async (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
+     try {
+        const memberToAdd = {
+            ...newMember,
+            avatar: `https://placehold.co/40x40.png`,
+        };
+        const addedMember = await addFamilyMember(memberToAdd);
+        setFamilyMembers(prev => [...prev, addedMember]);
+        toast({
+            title: 'Family Member Added',
+            description: `${newMember.name} has been added to your family group.`,
+        });
+    } catch (error) {
+        console.error("Error adding family member:", error);
+        toast({ title: 'Error', description: 'Failed to add family member.', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdateFamilyMember = async (updatedMember: FamilyMember) => {
+    try {
+        await updateFamilyMember(updatedMember.id, updatedMember);
+        setFamilyMembers(prev =>
+            prev.map(m => (m.id === updatedMember.id ? updatedMember : m))
+        );
+        toast({
+            title: 'Family Member Updated',
+            description: 'The member details have been updated successfully.',
+        });
+    } catch (error) {
+        console.error("Error updating family member:", error);
+        toast({ title: 'Error', description: 'Failed to update family member.', variant: 'destructive' });
+    } finally {
+      setEditingFamilyMember(null);
+      setAddFamilyMemberDialogOpen(false);
+    }
+  };
+
+  const handleDeleteFamilyMember = async () => {
+    if (deleteFamilyMemberTargetId) {
+      try {
+          await deleteFamilyMember(deleteFamilyMemberTargetId);
+          setFamilyMembers(prev => prev.filter(m => m.id !== deleteFamilyMemberTargetId));
+          toast({
+              title: 'Family Member Removed',
+              description: 'The family member has been removed.',
+              variant: 'destructive',
+          });
+      } catch (error) {
+          console.error("Error deleting family member:", error);
+          toast({ title: 'Error', description: 'Failed to remove family member.', variant: 'destructive' });
+      } finally {
+          setDeleteFamilyMemberTargetId(null);
+      }
     }
   };
 
@@ -175,12 +246,9 @@ export default function DashboardPage() {
     }
 
     if (activeMenu === 'My Passwords') {
-      // Assuming "My Passwords" are those not shared with anyone.
-      // In a real app, this would be based on the owner's ID.
       return credential.sharedWith.length === 0;
     }
     
-    // For "All Passwords", we already filtered by search, so return true.
     return true;
   });
 
@@ -246,7 +314,7 @@ export default function DashboardPage() {
           <Separator className="my-2" />
           <div className="flex items-center gap-3 p-2">
             <Avatar>
-              <AvatarImage src="https://placehold.co/40x40.png" alt="User" />
+              <AvatarImage data-ai-hint="person" src="https://placehold.co/40x40.png" alt="User" />
               <AvatarFallback>U</AvatarFallback>
             </Avatar>
             <div className="flex flex-col overflow-hidden">
@@ -293,24 +361,35 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
-            {activeMenu === 'Family Members' ? (
-              <FamilyMembersList
-                familyMembers={familyMembers}
-                onEdit={openEditFamilyMemberDialog}
-                onDelete={setDeleteFamilyMemberTargetId}
-              />
-            ) : (activeMenu === 'All Passwords' || activeMenu === 'My Passwords') ? (
-              <PasswordList
-                credentials={filteredCredentials}
-                familyMembers={familyMembers}
-                onEdit={openEditDialog}
-                onDelete={setDeleteTargetId}
-              />
-            ) : activeMenu === 'Settings' ? (
-              <div className="text-center p-8 border-2 border-dashed rounded-lg">Settings page coming soon!</div>
-            ) : activeMenu === 'Support' ? (
-              <div className="text-center p-8 border-2 border-dashed rounded-lg">Support page coming soon!</div>
-            ) : null}
+            {isLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <>
+                {activeMenu === 'Family Members' ? (
+                  <FamilyMembersList
+                    familyMembers={familyMembers}
+                    onEdit={openEditFamilyMemberDialog}
+                    onDelete={setDeleteFamilyMemberTargetId}
+                  />
+                ) : (activeMenu === 'All Passwords' || activeMenu === 'My Passwords') ? (
+                  <PasswordList
+                    credentials={filteredCredentials}
+                    familyMembers={familyMembers}
+                    onEdit={openEditDialog}
+                    onDelete={setDeleteTargetId}
+                  />
+                ) : activeMenu === 'Settings' ? (
+                  <div className="text-center p-8 border-2 border-dashed rounded-lg">Settings page coming soon!</div>
+                ) : activeMenu === 'Support' ? (
+                  <div className="text-center p-8 border-2 border-dashed rounded-lg">Support page coming soon!</div>
+                ) : null}
+              </>
+            )}
           </main>
         </div>
       </SidebarInset>

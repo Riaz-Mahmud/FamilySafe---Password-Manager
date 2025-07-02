@@ -91,7 +91,7 @@ export function AddFamilyMemberDialog({
           <DialogDescription>
             {isEditing
               ? "Update the family member's details."
-              : 'Invite a new member to your family group by email. They will be able to access shared passwords.'}
+              : 'Add a new member to your family group. They will be able to access shared passwords.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -126,7 +126,7 @@ export function AddFamilyMemberDialog({
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{isEditing ? 'Save Changes' : 'Send Invite'}</Button>
+              <Button type="submit">{isEditing ? 'Save Changes' : 'Add Member'}</Button>
             </DialogFooter>
           </form>
         </Form>

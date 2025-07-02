@@ -6,7 +6,7 @@ export interface Credential {
   notes: string;
   lastModified: string;
   sharedWith: string[]; // array of family member IDs
-  icon: React.ComponentType<any>;
+  icon: string;
 }
 
 export interface FamilyMember {

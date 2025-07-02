@@ -24,7 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
 
 type PasswordListProps = {
@@ -32,6 +32,12 @@ type PasswordListProps = {
   familyMembers: FamilyMember[];
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
+};
+
+const iconMap: { [key: string]: React.ComponentType<any> } = {
+  Github,
+  Globe,
+  Bot,
 };
 
 export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: PasswordListProps) {
@@ -74,13 +80,15 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete }: P
               const sharedWithMembers = familyMembers.filter(member =>
                 credential.sharedWith.includes(member.id)
               );
+              const IconComponent = iconMap[credential.icon] || Globe;
+
 
               return (
                 <TableRow key={credential.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
-                        <credential.icon className="w-5 h-5 text-muted-foreground" />
+                        <IconComponent className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div className="flex flex-col">
                         <span className="font-medium truncate">{new URL(credential.url).hostname}</span>
