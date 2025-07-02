@@ -54,6 +54,20 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     });
   };
 
+  const renderSiteCell = (credential: Credential) => {
+    try {
+        const urlObject = new URL(credential.url);
+        return (
+            <>
+                <a href={urlObject.href} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline">{urlObject.hostname}</a>
+                <span className="text-sm text-muted-foreground truncate">{urlObject.href}</span>
+            </>
+        )
+    } catch (error) {
+        return <span className="font-medium truncate">{credential.url}</span>
+    }
+  }
+
   if (credentials.length === 0) {
     return (
         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
@@ -72,7 +86,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Site</TableHead>
+              <TableHead className="w-[40%]">Site / Application</TableHead>
               <TableHead className="w-[30%]">Username</TableHead>
               <TableHead>Sharing</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -94,8 +108,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                         <IconComponent className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div className="flex flex-col overflow-hidden">
-                        <a href={credential.url} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline">{new URL(credential.url).hostname}</a>
-                        <span className="text-sm text-muted-foreground truncate">{credential.url}</span>
+                        {renderSiteCell(credential)}
                       </div>
                     </div>
                   </TableCell>

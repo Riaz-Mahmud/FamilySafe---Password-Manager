@@ -44,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 
 
 const formSchema = z.object({
-  url: z.string().url({ message: 'Please enter a valid URL.' }),
+  url: z.string().min(1, { message: 'Website or Application name is required.' }),
   username: z.string().min(1, { message: 'Username is required.' }),
   password: z.string().min(1, { message: 'Password is required.' }),
   notes: z.string().optional(),
@@ -145,9 +145,9 @@ export function AddPasswordDialog({
               name="url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Website URL</FormLabel>
+                  <FormLabel>Website or Application Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com" {...field} />
+                    <Input placeholder="e.g., google.com or My Game Account" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

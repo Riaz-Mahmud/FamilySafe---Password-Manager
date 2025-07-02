@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 const SendEmailSchema = z.object({
   emails: z.array(z.string().email()),
-  url: z.string().url(),
+  url: z.string(),
   username: z.string(),
   password: z.string(),
 });
@@ -32,13 +32,19 @@ export async function sendCredentialEmailAction(data: z.infer<typeof SendEmailSc
 
     sgMail.setApiKey(sendGridApiKey);
 
-    const siteName = new URL(url).hostname;
+    const siteName = (() => {
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return url;
+        }
+    })();
     const subject = `Your credentials for ${siteName}`;
     const body = `Hello,
 
 Here are the shared credentials from your FamilySafe account:
 
-Website: ${url}
+Website/Application: ${url}
 Username: ${username}
 Password: ${password}
 

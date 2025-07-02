@@ -87,6 +87,14 @@ export function SendEmailDialog({
 
   if (!credential) return null;
 
+  const siteOrAppName = (() => {
+      try {
+          return new URL(credential.url).hostname;
+      } catch {
+          return credential.url;
+      }
+  })();
+
   const sharedWithMembers = familyMembers.filter((member) =>
     credential.sharedWith.includes(member.id)
   );
@@ -101,7 +109,7 @@ export function SendEmailDialog({
           <DialogTitle className="font-headline">Send Credential via Email</DialogTitle>
           <DialogDescription>
             Select who should receive the credentials for{' '}
-            <strong>{new URL(credential.url).hostname}</strong>.
+            <strong>{siteOrAppName}</strong>.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
