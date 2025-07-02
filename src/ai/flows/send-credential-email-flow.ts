@@ -1,6 +1,8 @@
 'use server';
 /**
  * @fileOverview A flow to generate and "send" an email with credential details.
+ * This flow writes to a 'mail' collection in Firestore, which can be used
+ * with the "Trigger Email" Firebase Extension to send real emails.
  *
  * - sendCredentialEmail - A function that handles generating the email content.
  * - SendCredentialEmailInput - The input type for the sendCredentialEmail function.
@@ -9,6 +11,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { db } from '@/lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const SendCredentialEmailInputSchema = z.object({
   emails: z.array(z.string().email()).describe('The list of email addresses to send the credential to.'),
@@ -54,8 +58,8 @@ The body should state that the credentials are being shared from a FamilySafe ac
 Do not include the recipient's name in the body, as it will be sent to multiple people.`,
 });
 
-// This is a mock flow. In a real application, you would use a tool to call an email service like SendGrid or Mailgun.
-// For this example, we will generate the email content and show it to the user to simulate the action.
+// This flow now also writes to Firestore to trigger the "Trigger Email" Firebase Extension.
+// The simulation dialog will still be shown to the user.
 const sendCredentialEmailFlow = ai.defineFlow(
   {
     name: 'sendCredentialEmailFlow',
@@ -63,17 +67,31 @@ const sendCredentialEmailFlow = ai.defineFlow(
     outputSchema: SendCredentialEmailOutputSchema,
   },
   async (input) => {
-    console.log(`Simulating sending email with credentials for ${input.url} to: ${input.emails.join(', ')}`);
-
     const {output} = await generateEmailContentPrompt(input);
 
     if (!output) {
       throw new Error('Failed to generate email content.');
     }
+    
+    // This will trigger the Firebase Email Extension if it's installed.
+    try {
+      const mailCol = collection(db, 'mail');
+      await addDoc(mailCol, {
+        to: input.emails,
+        message: {
+          subject: output.subject,
+          text: output.body,
+        },
+      });
+      console.log('Email document added to Firestore "mail" collection.');
+    } catch (error) {
+        // Log the error but don't fail the whole flow, so the simulation can still be shown.
+        console.error('Error writing email document to Firestore:', error);
+    }
 
     return {
       success: true,
-      message: `Email content generated for ${new URL(input.url).hostname}.`,
+      message: `Email content generated for ${new URL(input.url).hostname}. If the Trigger Email extension is installed, an email will be sent.`,
       emailSubject: output.subject,
       emailBody: output.body,
     };
