@@ -1,3 +1,4 @@
+
 'use server';
 
 import sgMail from '@sendgrid/mail';
@@ -49,6 +50,11 @@ The FamilySafe Team`;
       from: sendGridFromEmail,
       subject: subject,
       text: body,
+      trackingSettings: {
+        clickTracking: {
+          enable: false,
+        },
+      },
     };
 
     await sgMail.send(msg);
