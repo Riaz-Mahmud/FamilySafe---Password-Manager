@@ -1,8 +1,7 @@
 'use server';
 /**
  * @fileOverview A flow to generate and send an email with credential details.
- * This flow sends a real email using SendGrid if configured, otherwise
- * it returns the content for simulation.
+ * This flow sends a real email using SendGrid if configured.
  *
  * - sendCredentialEmail - A function that handles generating and sending the email.
  * - SendCredentialEmailInput - The input type for the sendCredentialEmail function.
@@ -15,7 +14,7 @@ import sgMail from '@sendgrid/mail';
 
 const SendCredentialEmailInputSchema = z.object({
   emails: z.array(z.string().email()).describe('The list of email addresses to send the credential to.'),
-  url: z.string().url().describe('The URL of the website for the credential.'),
+  url: z.string().describe('The URL or name of the website/application for the credential.'),
   username: z.string().describe('The username for the credential.'),
   password: z.string().describe('The password for the credential.'),
 });
@@ -24,8 +23,6 @@ export type SendCredentialEmailInput = z.infer<typeof SendCredentialEmailInputSc
 const SendCredentialEmailOutputSchema = z.object({
   success: z.boolean().describe('Whether the email was sent successfully.'),
   message: z.string().describe('A confirmation message.'),
-  emailSubject: z.string().describe('The subject line of the generated email.'),
-  emailBody: z.string().describe('The body content of the generated email.'),
 });
 export type SendCredentialEmailOutput = z.infer<typeof SendCredentialEmailOutputSchema>;
 
@@ -47,13 +44,13 @@ const generateEmailContentPrompt = ai.definePrompt({
 The email should be professional, clear, and friendly.
 
 It should contain the following information:
-- Website URL: {{{url}}}
+- Website/Application: {{{url}}}
 - Username: {{{username}}}
 - Password: {{{password}}}
 
 Generate a subject line and a body for the email.
 The subject should be clear, like "Your credentials for [Website Name]".
-The body should state that the credentials are being shared from a FamilySafe account and should clearly list the URL, username, and password. Add a friendly closing.
+The body should state that the credentials are being shared from a FamilySafe account and should clearly list the URL/Name, username, and password. Add a friendly closing.
 Do not include the recipient's name in the body, as it will be sent to multiple people.`,
 });
 
@@ -67,42 +64,68 @@ const sendCredentialEmailFlow = ai.defineFlow(
     const {output: emailContent} = await generateEmailContentPrompt(input);
 
     if (!emailContent) {
-      throw new Error('Failed to generate email content.');
+      return { success: false, message: 'Failed to generate email content.' };
     }
 
     const sendGridApiKey = process.env.SENDGRID_API_KEY;
     const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
-    let message = '';
-
-    if (sendGridApiKey && sendGridFromEmail) {
-        sgMail.setApiKey(sendGridApiKey);
-        const msg = {
-            to: input.emails,
-            from: sendGridFromEmail,
-            subject: emailContent.subject,
-            text: emailContent.body,
-        };
-
-        try {
-            await sgMail.send(msg);
-            console.log('Credential email sent successfully via SendGrid.');
-            message = `An email with the credentials for ${new URL(input.url).hostname} has been sent to the selected recipients.`;
-        } catch (error) {
-            console.error('Error sending email via SendGrid:', error);
-            // Don't fail the whole flow, just log the error and update the message
-            message = `There was an error sending the email via SendGrid. Please check server logs. The generated content is available for review.`;
-        }
-
-    } else {
+    
+    if (!sendGridApiKey || !sendGridFromEmail) {
       console.warn('SendGrid API Key or From Email not found in environment variables. Email will not be sent.');
-      message = `Email sending is not configured. This is a simulation of the email that would be sent for ${new URL(input.url).hostname}.`;
+      return {
+        success: false,
+        message: 'Email service is not configured on the server. Could not send email.',
+      };
     }
 
-    return {
-      success: true,
-      message, // This message will be used in the toast/alert.
-      emailSubject: emailContent.subject,
-      emailBody: emailContent.body,
+    sgMail.setApiKey(sendGridApiKey);
+    const msg = {
+        to: input.emails,
+        from: sendGridFromEmail,
+        subject: emailContent.subject,
+        text: emailContent.body,
+        trackingSettings: {
+          clickTracking: {
+            enable: false,
+          },
+        },
     };
+
+    try {
+        await sgMail.send(msg);
+        console.log('Credential email sent successfully via SendGrid.');
+        return {
+          success: true,
+          message: `An email with the credentials for ${input.url} has been sent to the selected recipients.`,
+        };
+    } catch (error: any) {
+        console.error('Error sending email via SendGrid:', error);
+         if (error.response) {
+            const sendGridErrorBody = error.response.body;
+            if (sendGridErrorBody?.errors?.length > 0) {
+              const firstError = sendGridErrorBody.errors[0];
+              if (firstError.message.includes('authorization')) {
+                 return { 
+                    success: false, 
+                    message: 'SendGrid Authorization Failed: Please check if your SENDGRID_API_KEY is correct and has the required permissions.' 
+                 };
+              }
+              if (firstError.message.includes('does not match a verified Sender Identity')) {
+                 return { 
+                    success: false, 
+                    message: 'SendGrid Sender Error: The "from" email address has not been verified in your SendGrid account. Please complete sender verification.'
+                 };
+              }
+              return {
+                 success: false,
+                 message: `SendGrid Error: ${firstError.message}`
+              };
+            }
+        }
+        return { 
+            success: false, 
+            message: 'An unexpected error occurred while sending the email. Please check the server logs for more details.' 
+        };
+    }
   }
 );
