@@ -2,7 +2,7 @@ export interface Credential {
   id: string;
   url: string;
   username: string;
-  password?: string;
+  password: string;
   notes: string;
   lastModified: string;
   sharedWith: string[]; // array of family member IDs

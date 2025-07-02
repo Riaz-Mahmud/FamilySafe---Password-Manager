@@ -34,7 +34,7 @@ export async function getCredentials(userId: string): Promise<Credential[]> {
         id: doc.id,
         url: data.url,
         username: data.username,
-        password: data.password,
+        password: data.password || '',
         notes: data.notes,
         lastModified: formatTimestamp(data.lastModified),
         sharedWith: data.sharedWith || [],

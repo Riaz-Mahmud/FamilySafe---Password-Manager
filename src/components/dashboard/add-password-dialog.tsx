@@ -130,7 +130,7 @@ export function AddPasswordDialog({
         form.reset({
           url: credentialToEdit.url,
           username: credentialToEdit.username,
-          password: credentialToEdit.password || '',
+          password: credentialToEdit.password,
           notes: credentialToEdit.notes,
           sharedWith: credentialToEdit.sharedWith,
         });
