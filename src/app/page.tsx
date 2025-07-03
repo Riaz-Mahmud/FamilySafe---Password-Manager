@@ -232,7 +232,6 @@ export default function DashboardPage() {
       const newSharedWithIds = credential.sharedWith || [];
       const addedIds = newSharedWithIds.filter(id => !originalSharedWithIds.includes(id));
       
-      // From those members, filter out the ones that are not local and have an email
       const sharableMembers = familyMembers.filter(m => 
           addedIds.includes(m.id) && m.email && m.status !== 'local'
       );
@@ -240,9 +239,19 @@ export default function DashboardPage() {
       const emailsToShareWith = sharableMembers.map(m => m.email!);
 
       if (emailsToShareWith.length > 0) {
+          const sharerIdentifier = user.displayName || user.email;
+          if (!sharerIdentifier) {
+              toast({
+                  title: "Sharing Failed",
+                  description: "Your user profile could not be identified. Please try again.",
+                  variant: "destructive"
+              });
+              return;
+          }
+
           const result = await shareCredentialAction({
               fromUid: user.uid,
-              fromName: user.displayName || user.email!,
+              fromName: sharerIdentifier,
               toEmails: emailsToShareWith,
               credential: {
                   url: credential.url,

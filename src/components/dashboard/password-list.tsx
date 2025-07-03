@@ -153,8 +153,8 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     const sharedWithIds = credential.sharedWith || [];
     
     if (credential.isShared) {
-        const sharerName = credential.sharedBy || 'Someone';
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Shared by {sharerName}</Badge>;
+        const sharerName = credential.sharedBy;
+        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{sharerName ? `Shared by ${sharerName}` : 'Shared with you'}</Badge>;
     }
 
     if (sharedWithIds.length === 0) {
@@ -378,7 +378,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => onDelete(credential.id)}
-                              disabled={credential.isShared}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
