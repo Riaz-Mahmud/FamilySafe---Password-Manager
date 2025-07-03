@@ -134,7 +134,12 @@ export function getFamilyMembers(userId: string, callback: (familyMembers: Famil
 
 export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id' | 'uid'>): Promise<void> {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
-  const familyMemberDocRef = await addDoc(familyMembersCol, member);
+  
+  // Firestore does not allow `undefined` values. Create a clean object.
+  const { email, ...restOfMember } = member;
+  const dataToAdd = email ? member : restOfMember;
+
+  const familyMemberDocRef = await addDoc(familyMembersCol, dataToAdd);
 
   // If there's an email, it's an invitation. Local members don't get added to the invitations collection.
   if (member.email) {
