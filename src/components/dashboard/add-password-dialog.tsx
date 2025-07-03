@@ -358,9 +358,7 @@ export function AddPasswordDialog({
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
-                                    disabled={member.status !== 'active'}
                                     onSelect={() => {
-                                      if (member.status !== 'active') return;
                                       const selectedValues = field.value || [];
                                       const isSelected = selectedValues.includes(member.id);
                                       form.setValue(
@@ -387,7 +385,7 @@ export function AddPasswordDialog({
                         </PopoverContent>
                     </Popover>
                     <FormDescription>
-                      You can only share with family members who have accepted their invitation.
+                      Select family members to share with. Active members will get access immediately.
                     </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
                         {field.value?.map(id => {
