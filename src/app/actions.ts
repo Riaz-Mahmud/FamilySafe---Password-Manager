@@ -66,6 +66,7 @@ const ShareCredentialSchema = z.object({
   fromUid: z.string(),
   fromName: z.string(),
   toEmails: z.array(z.string().email()),
+  sourceCredentialId: z.string(),
   credential: z.object({
     url: z.string(),
     username: z.string(),
@@ -86,7 +87,7 @@ export async function shareCredentialAction(data: z.infer<typeof ShareCredential
       return { success: false, message: 'Invalid input data for sharing.' };
     }
 
-    const { fromUid, fromName, toEmails, credential } = parsedData.data;
+    const { fromUid, fromName, toEmails, credential, sourceCredentialId } = parsedData.data;
 
     for (const email of toEmails) {
       // Create a temporary, unencrypted share document.
@@ -96,6 +97,7 @@ export async function shareCredentialAction(data: z.infer<typeof ShareCredential
         fromName,
         toEmail: email,
         credential,
+        sourceCredentialId,
       });
     }
 

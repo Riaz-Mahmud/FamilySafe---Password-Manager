@@ -15,6 +15,8 @@ export interface Credential {
   isShared?: boolean;
   sharedBy?: string; // Name of the user who shared it
   sharedTo?: string;
+  ownerUid?: string;
+  sourceCredentialId?: string;
 }
 
 export interface FamilyMember {

@@ -190,6 +190,8 @@ export default function DashboardPage() {
               isShared: true,
               sharedBy: share.fromName,
               sharedTo: user.email!,
+              ownerUid: share.fromUid,
+              sourceCredentialId: share.sourceCredentialId,
             };
             
             // Add the claimed credential to the user's own list. This will encrypt it.
@@ -226,7 +228,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>, originalSharedWithIds: string[] = []) => {
+  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'> & { id: string }, originalSharedWithIds: string[] = []) => {
       if (!user) return;
       
       const newSharedWithIds = credential.sharedWith || [];
@@ -253,6 +255,7 @@ export default function DashboardPage() {
               fromUid: user.uid,
               fromName: sharerIdentifier,
               toEmails: emailsToShareWith,
+              sourceCredentialId: credential.id,
               credential: {
                   url: credential.url,
                   username: credential.username,
@@ -283,14 +286,16 @@ export default function DashboardPage() {
   const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => {
     if(!user) return;
     try {
-      await addCredential(user.uid, newCredential);
+      const savedCredentialId = await addCredential(user.uid, newCredential);
       await addAuditLog(user.uid, 'Create Credential', `Saved credential for ${newCredential.url}.`);
       toast({
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
       });
       // Handle sharing for new credentials
-      await handleSharing(newCredential);
+      if (newCredential.sharedWith && newCredential.sharedWith.length > 0) {
+        await handleSharing({ ...newCredential, id: savedCredentialId });
+      }
     } catch (error) {
       console.error("Error adding credential:", error);
       toast({ title: 'Error', description: 'Failed to add credential.', variant: 'destructive' });

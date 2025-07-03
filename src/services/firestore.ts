@@ -29,32 +29,85 @@ function formatTimestamp(timestamp: Timestamp | undefined): string {
 
 // --- Credentials ---
 
+async function checkShareValidity(cred: Credential): Promise<boolean> {
+  // Only validate credentials that look like they were shared with the new system.
+  if (!cred.isShared || !cred.ownerUid || !cred.sourceCredentialId) {
+    return true;
+  }
+  try {
+    const sourceDocRef = doc(db, 'users', cred.ownerUid, 'credentials', cred.sourceCredentialId);
+    const sourceDocSnap = await getDoc(sourceDocRef);
+    // If the owner's original credential doesn't exist anymore, this share is invalid.
+    return sourceDocSnap.exists();
+  } catch (error) {
+    // This will likely be a permissions error if rules are strict.
+    // In that case, we can't validate, so we don't delete.
+    // Log the error for debugging but assume the share is still valid to prevent data loss.
+    console.warn(`Could not validate share for credential "${cred.url}". It might be inaccessible or the owner has restrictive security rules.`);
+    return true;
+  }
+}
+
 export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
   const q = query(credentialsCol, orderBy('lastModified', 'desc'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
-    const credentials = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          url: data.url,
-          username: decryptData(data.username, userId),
-          password: decryptData(data.password, userId),
-          notes: decryptData(data.notes, userId),
-          lastModified: formatTimestamp(data.lastModified),
-          createdAt: formatTimestamp(data.createdAt),
-          sharedWith: data.sharedWith || [],
-          icon: data.icon,
-          tags: data.tags || [],
-          expiryMonths: data.expiryMonths,
-          safeForTravel: data.safeForTravel || false,
-          isShared: data.isShared || false,
-          sharedBy: data.sharedBy || undefined,
-          sharedTo: data.sharedTo || undefined,
-        } as Credential;
-    });
-    callback(credentials);
+    // This is an async callback, so we can do async work inside.
+    (async () => {
+      const credentialsFromDb: Credential[] = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            url: data.url,
+            username: decryptData(data.username, userId),
+            password: decryptData(data.password, userId),
+            notes: decryptData(data.notes, userId),
+            lastModified: formatTimestamp(data.lastModified),
+            createdAt: formatTimestamp(data.createdAt),
+            sharedWith: data.sharedWith || [],
+            icon: data.icon,
+            tags: data.tags || [],
+            expiryMonths: data.expiryMonths,
+            safeForTravel: data.safeForTravel || false,
+            isShared: data.isShared || false,
+            sharedBy: data.sharedBy || undefined,
+            sharedTo: data.sharedTo || undefined,
+            ownerUid: data.ownerUid || undefined,
+            sourceCredentialId: data.sourceCredentialId || undefined,
+          } as Credential;
+      });
+
+      const validatedCredentials: Credential[] = [];
+      const validationPromises = credentialsFromDb.map(async (cred) => {
+        const isValid = await checkShareValidity(cred);
+        return { cred, isValid };
+      });
+      
+      const results = await Promise.all(validationPromises);
+      const staleCredentialIds: string[] = [];
+
+      results.forEach(result => {
+        if (result.isValid) {
+          validatedCredentials.push(result.cred);
+        } else {
+          staleCredentialIds.push(result.cred.id);
+        }
+      });
+      
+      // Update UI right away with valid credentials.
+      callback(validatedCredentials);
+      
+      // Asynchronously delete stale credentials in the background.
+      if (staleCredentialIds.length > 0) {
+        console.log(`Found ${staleCredentialIds.length} stale shared credential(s) to remove.`);
+        for (const id of staleCredentialIds) {
+          // This deletion will trigger the onSnapshot listener again, which will re-render the UI with the updated list.
+          deleteCredential(userId, id).catch(err => console.error(`Failed to delete stale credential ${id}`, err));
+        }
+      }
+
+    })();
   }, (error) => {
     console.error("Error fetching credentials:", error);
     callback([]);
@@ -63,7 +116,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
   return unsubscribe;
 }
 
-export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>): Promise<void> {
+export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>): Promise<string> {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
   
   const encryptedCredential = {
@@ -77,11 +130,14 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     isShared: credential.isShared || false,
     sharedBy: credential.sharedBy || null,
     sharedTo: credential.sharedTo || null,
+    ownerUid: credential.ownerUid || null,
+    sourceCredentialId: credential.sourceCredentialId || null,
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
 
-  await addDoc(credentialsCol, encryptedCredential);
+  const docRef = await addDoc(credentialsCol, encryptedCredential);
+  return docRef.id;
 }
 
 export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id' | 'createdAt'>>): Promise<void> {
@@ -485,7 +541,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
 
 // --- Sharing ---
 
-export async function createShare(shareData: { fromUid: string, fromName: string, toEmail: string, credential: any }): Promise<void> {
+export async function createShare(shareData: { fromUid: string, fromName: string, toEmail: string, credential: any, sourceCredentialId: string }): Promise<void> {
   const sharesCol = collection(db, 'shares');
   await addDoc(sharesCol, {
     ...shareData,
