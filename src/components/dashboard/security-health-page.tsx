@@ -116,13 +116,13 @@ export function PasswordHealthReportPage({ credentials, onEditCredential }: Pass
                             <div className="border rounded-lg">
                                 <ul className="divide-y">
                                     {report.pwned.map(cred => (
-                                        <li key={cred.id} className="p-4 flex justify-between items-center">
-                                            <div>
+                                        <li key={cred.id} className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                            <div className="w-full">
                                                 <p className="font-medium">{cred.url}</p>
                                                 <p className="text-sm text-muted-foreground">{cred.username}</p>
                                                 <p className="text-xs text-destructive mt-1">Found in {cred.pwnedCount.toLocaleString()} breaches</p>
                                             </div>
-                                            <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)}>Change Password</Button>
+                                            <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)} className="w-full sm:w-auto flex-shrink-0">Change Password</Button>
                                         </li>
                                     ))}
                                 </ul>
@@ -151,12 +151,12 @@ export function PasswordHealthReportPage({ credentials, onEditCredential }: Pass
                                     <p className="p-3 bg-muted text-sm font-medium">Used for {group.count} accounts:</p>
                                     <ul className="divide-y">
                                         {group.credentials.map(cred => (
-                                             <li key={cred.id} className="p-4 flex justify-between items-center">
-                                                <div>
+                                             <li key={cred.id} className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                                <div className="w-full">
                                                     <p className="font-medium">{cred.url}</p>
                                                     <p className="text-sm text-muted-foreground">{cred.username}</p>
                                                 </div>
-                                                <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)}>Change Password</Button>
+                                                <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)} className="w-full sm:w-auto flex-shrink-0">Change Password</Button>
                                             </li>
                                         ))}
                                     </ul>
@@ -184,12 +184,12 @@ export function PasswordHealthReportPage({ credentials, onEditCredential }: Pass
                             <div className="border rounded-lg">
                                 <ul className="divide-y">
                                     {report.weak.map(cred => (
-                                         <li key={cred.id} className="p-4 flex justify-between items-center">
-                                            <div>
+                                         <li key={cred.id} className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                            <div className="w-full">
                                                 <p className="font-medium">{cred.url}</p>
                                                 <p className="text-sm text-muted-foreground">{cred.username}</p>
                                             </div>
-                                            <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)}>Change Password</Button>
+                                            <Button variant="outline" size="sm" onClick={() => onEditCredential(cred)} className="w-full sm:w-auto flex-shrink-0">Change Password</Button>
                                         </li>
                                     ))}
                                 </ul>

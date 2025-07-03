@@ -58,7 +58,7 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
               const Icon = getDeviceIcon(result.device.type);
 
               return (
-                <li key={session.id} className="py-4 flex items-center justify-between gap-4">
+                <li key={session.id} className="py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
                     {Icon}
                     <div className="overflow-hidden">
@@ -81,6 +81,7 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
                             variant="outline" 
                             size="sm"
                             disabled={session.isCurrent}
+                            className="w-full sm:w-auto"
                         >
                             Revoke
                         </Button>

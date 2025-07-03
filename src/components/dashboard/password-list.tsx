@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
+import { Card, CardContent } from '@/components/ui/card';
 
 type PasswordListProps = {
   credentials: Credential[];
@@ -80,9 +81,124 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     );
   }
 
+  const renderSharedWith = (credential: Credential) => {
+    const sharedWithMembers = familyMembers.filter(member =>
+      credential.sharedWith.includes(member.id)
+    );
+    if (sharedWithMembers.length > 0) {
+      return (
+        <div className="flex items-center">
+          {sharedWithMembers.slice(0, 3).map((member) => (
+              <Tooltip key={member.id}>
+              <TooltipTrigger asChild>
+                  <Avatar className={`h-8 w-8 border-2 border-background -ml-2 first:ml-0`}>
+                  <AvatarImage src={member.avatar} alt={member.name} />
+                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+              </TooltipTrigger>
+              <TooltipContent>{member.name}</TooltipContent>
+              </Tooltip>
+          ))}
+          {sharedWithMembers.length > 3 && (
+              <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background -ml-2 flex items-center justify-center text-xs font-semibold">
+                  +{sharedWithMembers.length - 3}
+              </div>
+          )}
+        </div>
+      )
+    }
+    return <Badge variant="outline">Only You</Badge>
+  }
+
   return (
     <TooltipProvider>
-      <div className="border rounded-lg">
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {credentials.map(credential => {
+            const IconComponent = iconMap[credential.icon] || Globe;
+            return (
+                <Card key={credential.id} className="w-full">
+                    <CardContent className="p-4 flex flex-col gap-4">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
+                                <IconComponent className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <div className="flex flex-col overflow-hidden">
+                                {renderSiteCell(credential)}
+                                </div>
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => onEdit(credential)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => onSend(credential)}>
+                                      <Mail className="mr-2 h-4 w-4" />
+                                      Send Email
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => onDelete(credential.id)}
+                                    >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                        
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-muted-foreground">Username</p>
+                            <div className="flex items-center gap-2">
+                                <span className="truncate">{credential.username}</span>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => handleCopy(credential.username, 'Username')}
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Copy username</TooltipContent>
+                                </Tooltip>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-muted-foreground">Sharing</p>
+                            <div className="pt-1">
+                                {renderSharedWith(credential)}
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopy(credential.password || '', 'Password')}
+                            className="w-full"
+                        >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy password
+                        </Button>
+                    </CardContent>
+                </Card>
+            )
+        })}
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
@@ -94,12 +210,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
           </TableHeader>
           <TableBody>
             {credentials.map(credential => {
-              const sharedWithMembers = familyMembers.filter(member =>
-                credential.sharedWith.includes(member.id)
-              );
               const IconComponent = iconMap[credential.icon] || Globe;
-
-
               return (
                 <TableRow key={credential.id}>
                   <TableCell>
@@ -131,28 +242,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                     </div>
                   </TableCell>
                   <TableCell>
-                    {sharedWithMembers.length > 0 ? (
-                      <div className="flex items-center">
-                        {sharedWithMembers.slice(0, 3).map((member, index) => (
-                           <Tooltip key={member.id}>
-                            <TooltipTrigger asChild>
-                              <Avatar className={`h-8 w-8 border-2 border-background -ml-2 first:ml-0`}>
-                                <AvatarImage src={member.avatar} alt={member.name} />
-                                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                            </TooltipTrigger>
-                            <TooltipContent>{member.name}</TooltipContent>
-                           </Tooltip>
-                        ))}
-                         {sharedWithMembers.length > 3 && (
-                            <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background -ml-2 flex items-center justify-center text-xs font-semibold">
-                                +{sharedWithMembers.length - 3}
-                            </div>
-                        )}
-                      </div>
-                    ) : (
-                      <Badge variant="outline">Only You</Badge>
-                    )}
+                    {renderSharedWith(credential)}
                   </TableCell>
                   <TableCell className="text-right">
                      <div className="flex items-center justify-end gap-2">

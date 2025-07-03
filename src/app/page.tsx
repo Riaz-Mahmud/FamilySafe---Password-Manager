@@ -525,16 +525,16 @@ export default function DashboardPage() {
                   />
                 </div>
                 <Button onClick={openAddDialog} className="font-semibold">
-                  <Plus className="mr-2 h-5 w-5" />
-                  Add Credential
+                  <Plus className="h-5 w-5 md:mr-2" />
+                  <span className="hidden md:inline">Add Credential</span>
                 </Button>
               </>
             ) : activeMenu === 'Family Members' ? (
               <>
                 <div className="flex-1" />
                 <Button onClick={openAddFamilyMemberDialog} className="font-semibold">
-                  <Plus className="mr-2 h-5 w-5" />
-                  Add Family Member
+                  <Plus className="h-5 w-5 md:mr-2" />
+                  <span className="hidden md:inline">Add Family Member</span>
                 </Button>
               </>
             ) : <div className="flex-1" />}

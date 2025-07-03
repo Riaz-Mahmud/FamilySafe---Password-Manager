@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Card, CardContent } from '@/components/ui/card';
 import { History } from 'lucide-react';
 
 type AuditLogsPageProps = {
@@ -30,7 +31,24 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
   }
 
   return (
-    <div className="border rounded-lg">
+    <>
+    {/* Mobile View */}
+    <div className="md:hidden space-y-3">
+        {logs.map((log) => (
+            <Card key={log.id}>
+                <CardContent className="p-4 space-y-2">
+                    <div className="flex justify-between items-start gap-4">
+                        <p className="font-medium">{log.action}</p>
+                        <p className="text-sm text-muted-foreground text-right shrink-0">{log.timestamp}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{log.description}</p>
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+
+    {/* Desktop View */}
+    <div className="hidden md:block border rounded-lg">
       <Table>
         <TableHeader>
           <TableRow>
@@ -50,5 +68,6 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }
