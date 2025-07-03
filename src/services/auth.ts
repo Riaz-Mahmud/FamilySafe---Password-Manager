@@ -12,7 +12,7 @@ import {
   fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { addDeviceSession, revokeDeviceSession } from './firestore';
+import { revokeDeviceSession } from './firestore';
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -23,18 +23,12 @@ export async function signUp(email: string, password: string): Promise<User> {
 
 export async function signIn(email: string, password: string): Promise<User> {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    const sessionId = await addDeviceSession(user.uid, navigator.userAgent);
-    localStorage.setItem('sessionId', sessionId);
-    return user;
+    return userCredential.user;
 }
 
 export async function signInWithGoogle(): Promise<User> {
     const userCredential = await signInWithPopup(auth, googleProvider);
-    const user = userCredential.user;
-    const sessionId = await addDeviceSession(user.uid, navigator.userAgent);
-    localStorage.setItem('sessionId', sessionId);
-    return user;
+    return userCredential.user;
 }
 
 export async function signOutUser(): Promise<void> {

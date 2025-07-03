@@ -5,7 +5,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { updateSessionLastSeen, findAndActivateByEmail } from '@/services/firestore';
+import { addDeviceSession, updateSessionLastSeen, findAndActivateByEmail, addAuditLog } from '@/services/firestore';
 
 type AuthContextType = {
   user: User | null;
@@ -34,34 +34,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let unsubscribeSession: () => void;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
       setLoading(false);
 
       if (unsubscribeSession) {
         unsubscribeSession();
       }
 
-      if (user) {
-        // When a user signs in, check if they have any pending invitations to activate their account.
-        if (user.email) {
-          await findAndActivateByEmail(user.uid, user.email);
-        }
+      if (currentUser) {
+        // This is the key logic: we check for a session ID in local storage.
+        // Its absence indicates a fresh login for this browser instance.
+        const sessionIdFromStorage = localStorage.getItem('sessionId');
+        let sessionId = sessionIdFromStorage;
 
-        const sessionId = localStorage.getItem('sessionId');
-        if (sessionId) {
-          updateSessionLastSeen(user.uid, sessionId);
+        if (!sessionId) {
+          // No session ID means this is a new login.
+          // Create session, add audit log, and check for invitations.
+          sessionId = await addDeviceSession(currentUser.uid, navigator.userAgent);
+          localStorage.setItem('sessionId', sessionId);
+          await addAuditLog(currentUser.uid, 'User Signed In', `User signed in with ${currentUser.providerData[0]?.providerId || 'email'}.`);
           
-          const sessionRef = doc(db, 'users', user.uid, 'sessions', sessionId);
+          if (currentUser.email) {
+            await findAndActivateByEmail(currentUser.uid, currentUser.email);
+          }
+        }
+        
+        // For every auth state change where the user is logged in,
+        // ensure we update their last seen time and listen for remote sign-out.
+        if (sessionId) {
+          updateSessionLastSeen(currentUser.uid, sessionId);
+          
+          const sessionRef = doc(db, 'users', currentUser.uid, 'sessions', sessionId);
           unsubscribeSession = onSnapshot(sessionRef, (doc) => {
             if (!doc.exists()) {
+              // This session has been revoked remotely. Sign the user out.
               signOut(auth);
               localStorage.removeItem('sessionId');
             }
           });
         }
       } else {
-         localStorage.removeItem('sessionId');
+        // User is signed out, clear the session ID.
+        localStorage.removeItem('sessionId');
       }
     });
 

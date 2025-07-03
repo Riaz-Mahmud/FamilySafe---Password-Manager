@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { Logo } from '@/components/logo';
 import { signIn, signInWithGoogle } from '@/services/auth';
-import { addAuditLog } from '@/services/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
@@ -33,9 +32,8 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const loggedInUser = await signIn(email, password);
-      await addAuditLog(loggedInUser.uid, 'User Signed In', 'User signed in with email and password.');
-      router.replace('/');
+      await signIn(email, password);
+      // The redirect is now handled by the useEffect watching the auth state.
     } catch (error: any) {
       toast({
         title: 'Login Failed',
@@ -50,9 +48,8 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      const loggedInUser = await signInWithGoogle();
-      await addAuditLog(loggedInUser.uid, 'User Signed In', 'User signed in with Google.');
-      router.replace('/');
+      await signInWithGoogle();
+      // The redirect is now handled by the useEffect watching the auth state.
     } catch (error: any) {
        toast({
         title: 'Google Sign-In Failed',
