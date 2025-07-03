@@ -135,8 +135,8 @@ export function AddPasswordDialog({
           <DialogTitle className="font-headline">{isEditing ? 'Edit Credential' : 'Add a New Credential'}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? 'Update the details for this credential.'
-              : 'Enter the details for the new password you want to save.'}
+              ? 'Update the details for this credential. All sensitive information is securely encrypted.'
+              : 'Save a new credential. All sensitive information, including any notes, will be securely encrypted.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -211,10 +211,10 @@ export function AddPasswordDialog({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes (optional)</FormLabel>
+                  <FormLabel>Secure Notes (optional)</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="e.g. Security questions, recovery codes..."
+                      placeholder="Encrypted notes, e.g., recovery codes, bank info..."
                       {...field}
                     />
                   </FormControl>
