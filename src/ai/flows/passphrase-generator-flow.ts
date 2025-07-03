@@ -11,7 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const PassphraseGeneratorInputSchema = z.object({
+const PassphraseGeneratorInputSchema = z.object({
   numberOfWords: z
     .number()
     .min(3)
@@ -21,7 +21,7 @@ export const PassphraseGeneratorInputSchema = z.object({
 });
 export type PassphraseGeneratorInput = z.infer<typeof PassphraseGeneratorInputSchema>;
 
-export const PassphraseGeneratorOutputSchema = z.object({
+const PassphraseGeneratorOutputSchema = z.object({
   passphrase: z
     .string()
     .describe('The generated passphrase, consisting of lowercase words separated by dashes.'),
