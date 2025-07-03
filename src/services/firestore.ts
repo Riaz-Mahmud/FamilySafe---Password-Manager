@@ -41,6 +41,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           lastModified: formatTimestamp(data.lastModified),
           sharedWith: data.sharedWith || [],
           icon: data.icon,
+          tags: data.tags || [],
         } as Credential;
     });
     callback(credentials);
@@ -60,6 +61,7 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     username: encryptData(credential.username, userId),
     password: encryptData(credential.password, userId),
     notes: encryptData(credential.notes || '', userId),
+    tags: credential.tags || [],
     lastModified: serverTimestamp(),
   };
 

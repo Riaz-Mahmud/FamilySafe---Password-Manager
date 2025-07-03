@@ -49,6 +49,7 @@ const formSchema = z.object({
   password: z.string().min(1, { message: 'Password is required.' }),
   notes: z.string().optional(),
   sharedWith: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 type AddPasswordDialogProps = {
@@ -69,6 +70,7 @@ export function AddPasswordDialog({
   credentialToEdit,
 }: AddPasswordDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [tagInput, setTagInput] = useState('');
   const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
@@ -80,12 +82,14 @@ export function AddPasswordDialog({
       password: '',
       notes: '',
       sharedWith: [],
+      tags: [],
     },
   });
 
   useEffect(() => {
     if (open) {
       setShowPassword(false);
+      setTagInput('');
       if (credentialToEdit) {
         form.reset({
           url: credentialToEdit.url,
@@ -93,6 +97,7 @@ export function AddPasswordDialog({
           password: credentialToEdit.password,
           notes: credentialToEdit.notes,
           sharedWith: credentialToEdit.sharedWith,
+          tags: credentialToEdit.tags || [],
         });
       } else {
         form.reset({
@@ -101,6 +106,7 @@ export function AddPasswordDialog({
           password: '',
           notes: '',
           sharedWith: [],
+          tags: [],
         });
       }
     }
@@ -113,6 +119,7 @@ export function AddPasswordDialog({
         ...values,
         notes: values.notes || '',
         sharedWith: values.sharedWith || [],
+        tags: values.tags || [],
         lastModified: new Date().toLocaleDateString(),
       });
     } else {
@@ -123,6 +130,7 @@ export function AddPasswordDialog({
         notes: values.notes || '',
         icon: 'Globe', // Default icon
         sharedWith: values.sharedWith || [],
+        tags: values.tags || [],
       });
     }
     onOpenChange(false);
@@ -217,6 +225,53 @@ export function AddPasswordDialog({
                       placeholder="Encrypted notes, e.g., recovery codes, bank info..."
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags (optional)</FormLabel>
+                  <FormControl>
+                    <>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {field.value?.map((tag, index) => (
+                          <Badge variant="secondary" key={index} className="gap-1.5">
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                form.setValue(
+                                  'tags',
+                                  field.value?.filter((_, i) => i !== index)
+                                );
+                              }}
+                              className="rounded-full hover:bg-muted-foreground/20"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <Input
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && tagInput.trim()) {
+                            e.preventDefault();
+                            if (!field.value?.includes(tagInput.trim())) {
+                              form.setValue('tags', [...(field.value || []), tagInput.trim()]);
+                            }
+                            setTagInput('');
+                          }
+                        }}
+                        placeholder="Type a tag and press Enter"
+                      />
+                    </>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

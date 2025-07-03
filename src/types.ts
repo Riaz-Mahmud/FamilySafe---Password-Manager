@@ -1,3 +1,4 @@
+
 export interface Credential {
   id: string;
   url: string;
@@ -7,6 +8,7 @@ export interface Credential {
   lastModified: string;
   sharedWith: string[]; // array of family member IDs
   icon: string;
+  tags: string[];
 }
 
 export interface FamilyMember {

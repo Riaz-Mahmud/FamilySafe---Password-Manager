@@ -110,6 +110,17 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     return <Badge variant="outline">Only You</Badge>
   }
 
+  const renderTags = (credential: Credential) => {
+    if (!credential.tags || credential.tags.length === 0) return null;
+    return (
+        <div className="flex flex-wrap gap-1 mt-1">
+            {credential.tags.map(tag => (
+                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+            ))}
+        </div>
+    )
+  }
+
   return (
     <TooltipProvider>
       {/* Mobile View */}
@@ -126,6 +137,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
                                 {renderSiteCell(credential)}
+                                {renderTags(credential)}
                                 </div>
                             </div>
                             <DropdownMenu>
@@ -220,6 +232,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                       </div>
                       <div className="flex flex-col overflow-hidden">
                         {renderSiteCell(credential)}
+                        {renderTags(credential)}
                       </div>
                     </div>
                   </TableCell>

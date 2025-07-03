@@ -330,9 +330,13 @@ export default function DashboardPage() {
   };
 
   const filteredCredentials = credentials.filter(credential => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    
     const searchMatch =
-      credential.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      credential.username.toLowerCase().includes(searchTerm.toLowerCase());
+      credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
+      credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
+      (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+
 
     if (!searchMatch) {
       return false;
@@ -518,7 +522,7 @@ export default function DashboardPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search passwords..."
+                    placeholder="Search passwords by site, username, or tag..."
                     className="pl-10 w-full max-w-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
