@@ -13,6 +13,7 @@ export interface Credential {
   expiryMonths?: number;
   safeForTravel?: boolean;
   isShared?: boolean;
+  sharedBy?: string; // Name of the user who shared it
   sharedTo?: string;
 }
 

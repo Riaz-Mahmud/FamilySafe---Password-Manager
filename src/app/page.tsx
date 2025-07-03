@@ -188,6 +188,7 @@ export default function DashboardPage() {
               notes: `Shared by ${share.fromName}.\n\n${share.credential.notes || ''}`,
               sharedWith: [], // A shared credential cannot be re-shared
               isShared: true,
+              sharedBy: share.fromName,
               sharedTo: user.email!,
             };
             

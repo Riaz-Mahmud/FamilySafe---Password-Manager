@@ -50,6 +50,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           expiryMonths: data.expiryMonths,
           safeForTravel: data.safeForTravel || false,
           isShared: data.isShared || false,
+          sharedBy: data.sharedBy || undefined,
           sharedTo: data.sharedTo || undefined,
         } as Credential;
     });
@@ -74,6 +75,7 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     expiryMonths: credential.expiryMonths || null,
     safeForTravel: credential.safeForTravel || false,
     isShared: credential.isShared || false,
+    sharedBy: credential.sharedBy || null,
     sharedTo: credential.sharedTo || null,
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
@@ -103,6 +105,9 @@ export async function updateCredential(userId: string, id: string, credential: P
   }
   if (credential.hasOwnProperty('isShared')) {
     encryptedUpdate.isShared = credential.isShared || false;
+  }
+  if (credential.hasOwnProperty('sharedBy')) {
+    encryptedUpdate.sharedBy = credential.sharedBy || null;
   }
   if (credential.hasOwnProperty('sharedTo')) {
     encryptedUpdate.sharedTo = credential.sharedTo || null;
@@ -433,6 +438,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             icon: data.icon,
             tags: data.tags || [],
             expiryMonths: data.expiryMonths,
+            sharedBy: data.sharedBy,
         };
     });
 

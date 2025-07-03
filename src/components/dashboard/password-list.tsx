@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -149,18 +150,19 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   }
 
   const renderSharedWith = (credential: Credential) => {
-    const sharedWithEmails = credential.sharedWith || [];
+    const sharedWithIds = credential.sharedWith || [];
     
     if (credential.isShared) {
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Shared with me</Badge>;
+        const sharerName = credential.sharedBy || 'Someone';
+        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Shared by {sharerName}</Badge>;
     }
 
-    if (sharedWithEmails.length === 0) {
+    if (sharedWithIds.length === 0) {
         return <Badge variant="outline">Only You</Badge>;
     }
 
     const sharedWithMembers = familyMembers.filter(member =>
-      sharedWithEmails.includes(member.email!)
+      sharedWithIds.includes(member.id)
     );
     
     if (sharedWithMembers.length > 0) {
