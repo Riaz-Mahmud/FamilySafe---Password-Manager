@@ -16,6 +16,8 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarMenuAction,
+  SidebarGroupLabel,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   Home,

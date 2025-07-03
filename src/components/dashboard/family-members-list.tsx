@@ -12,7 +12,7 @@ type FamilyMembersListProps = {
   familyMembers: FamilyMember[];
   onEdit: (member: FamilyMember) => void;
   onDelete: (id: string) => void;
-  onMemberSelect: (id: string) => void;
+  onMemberSelect?: (id: string) => void;
 };
 
 export function FamilyMembersList({ familyMembers, onEdit, onDelete, onMemberSelect }: FamilyMembersListProps) {
@@ -35,7 +35,7 @@ export function FamilyMembersList({ familyMembers, onEdit, onDelete, onMemberSel
           <CardContent className="p-0 flex flex-col items-center text-center flex-grow">
             <div
               className="w-full p-6 flex flex-col items-center cursor-pointer hover:bg-muted/50 rounded-t-lg flex-grow"
-              onClick={() => onMemberSelect(member.id)}
+              onClick={() => onMemberSelect?.(member.id)}
             >
               <Avatar className="h-20 w-20 mb-4">
                 <AvatarImage src={member.avatar} alt={member.name} />
