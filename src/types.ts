@@ -6,9 +6,11 @@ export interface Credential {
   password: string;
   notes: string;
   lastModified: string;
+  createdAt: string;
   sharedWith: string[]; // array of family member IDs
   icon: string;
   tags: string[];
+  expiryMonths?: number;
 }
 
 export interface FamilyMember {
@@ -19,7 +21,7 @@ export interface FamilyMember {
 }
 
 export interface AuditLog {
-  id: string;
+  id:string;
   action: string;
   description: string;
   timestamp: string;

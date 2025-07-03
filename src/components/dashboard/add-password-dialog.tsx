@@ -16,6 +16,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -34,6 +35,13 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,12 +58,13 @@ const formSchema = z.object({
   notes: z.string().optional(),
   sharedWith: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
+  expiryMonths: z.number().optional(),
 });
 
 type AddPasswordDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddCredential: (credential: Omit<Credential, 'id' | 'lastModified'>) => void;
+  onAddCredential: (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => void;
   onUpdateCredential: (credential: Credential) => void;
   familyMembers: FamilyMember[];
   credentialToEdit: Credential | null;
@@ -83,6 +92,7 @@ export function AddPasswordDialog({
       notes: '',
       sharedWith: [],
       tags: [],
+      expiryMonths: 0,
     },
   });
 
@@ -98,6 +108,7 @@ export function AddPasswordDialog({
           notes: credentialToEdit.notes,
           sharedWith: credentialToEdit.sharedWith,
           tags: credentialToEdit.tags || [],
+          expiryMonths: credentialToEdit.expiryMonths || 0,
         });
       } else {
         form.reset({
@@ -107,30 +118,30 @@ export function AddPasswordDialog({
           notes: '',
           sharedWith: [],
           tags: [],
+          expiryMonths: 0,
         });
       }
     }
   }, [open, credentialToEdit, form]);
   
   function onSubmit(values: z.infer<typeof formSchema>) {
-    if (credentialToEdit) {
-      onUpdateCredential({
-        ...credentialToEdit,
+    const data = {
         ...values,
         notes: values.notes || '',
         sharedWith: values.sharedWith || [],
         tags: values.tags || [],
-        lastModified: new Date().toLocaleDateString(),
+        expiryMonths: values.expiryMonths || 0,
+    };
+
+    if (credentialToEdit) {
+      onUpdateCredential({
+        ...credentialToEdit,
+        ...data,
       });
     } else {
       onAddCredential({
-        url: values.url,
-        username: values.username,
-        password: values.password,
-        notes: values.notes || '',
+        ...data,
         icon: 'Globe', // Default icon
-        sharedWith: values.sharedWith || [],
-        tags: values.tags || [],
       });
     }
     onOpenChange(false);
@@ -226,6 +237,32 @@ export function AddPasswordDialog({
                       {...field}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="expiryMonths"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password Rotation</FormLabel>
+                  <Select onValueChange={(value) => field.onChange(parseInt(value, 10))} defaultValue={String(field.value || 0)}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Set a reminder to change this password" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="0">Never</SelectItem>
+                      <SelectItem value="3">Every 3 months</SelectItem>
+                      <SelectItem value="6">Every 6 months</SelectItem>
+                      <SelectItem value="12">Every 12 months</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Get a reminder to rotate this password periodically.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

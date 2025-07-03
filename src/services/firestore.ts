@@ -40,9 +40,11 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           password: decryptData(data.password, userId),
           notes: decryptData(data.notes, userId),
           lastModified: formatTimestamp(data.lastModified),
+          createdAt: formatTimestamp(data.createdAt),
           sharedWith: data.sharedWith || [],
           icon: data.icon,
           tags: data.tags || [],
+          expiryMonths: data.expiryMonths,
         } as Credential;
     });
     callback(credentials);
@@ -54,7 +56,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
   return unsubscribe;
 }
 
-export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified'>): Promise<void> {
+export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>): Promise<void> {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
   
   const encryptedCredential = {
@@ -63,13 +65,15 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     password: encryptData(credential.password, userId),
     notes: encryptData(credential.notes || '', userId),
     tags: credential.tags || [],
+    expiryMonths: credential.expiryMonths || null,
+    createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
 
   await addDoc(credentialsCol, encryptedCredential);
 }
 
-export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id'>>): Promise<void> {
+export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id' | 'createdAt'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
   
   const encryptedUpdate: { [key: string]: any } = { ...credential };
@@ -81,6 +85,9 @@ export async function updateCredential(userId: string, id: string, credential: P
   }
   if (credential.hasOwnProperty('notes')) {
     encryptedUpdate.notes = encryptData(credential.notes || '', userId);
+  }
+  if (credential.hasOwnProperty('expiryMonths')) {
+    encryptedUpdate.expiryMonths = credential.expiryMonths || null;
   }
 
   await updateDoc(docRef, {
@@ -265,9 +272,11 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             password: decryptData(data.password, userId),
             notes: decryptData(data.notes, userId),
             lastModified: formatTimestamp(data.lastModified),
+            createdAt: formatTimestamp(data.createdAt),
             sharedWith: data.sharedWith || [],
             icon: data.icon,
             tags: data.tags || [],
+            expiryMonths: data.expiryMonths,
         };
     });
 

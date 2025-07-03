@@ -162,7 +162,7 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified'>) => {
+  const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => {
     if(!user) return;
     try {
       await addCredential(user.uid, newCredential);

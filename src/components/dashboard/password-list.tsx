@@ -26,9 +26,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
+import { addMonths, differenceInDays, format, isPast } from 'date-fns';
 
 type PasswordListProps = {
   credentials: Credential[];
@@ -45,6 +46,32 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   Bot,
 };
 
+const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) => {
+  if (!expiryMonths || expiryMonths === 0 || !createdAt) {
+    return { status: 'ok', message: null };
+  }
+
+  const createdDate = new Date(createdAt);
+  if (isNaN(createdDate.getTime())) {
+    return { status: 'ok', message: null };
+  }
+  
+  const expiryDate = addMonths(createdDate, expiryMonths);
+  const today = new Date();
+  
+  if (isPast(expiryDate)) {
+    return { status: 'expired', message: `Expired on ${format(expiryDate, 'MMM d, yyyy')}` };
+  }
+  
+  const daysRemaining = differenceInDays(expiryDate, today);
+  
+  if (daysRemaining <= 30) {
+    return { status: 'expiring', message: `Expires in ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''}` };
+  }
+  
+  return { status: 'ok', message: `Expires on ${format(expiryDate, 'MMM d, yyyy')}` };
+};
+
 export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect }: PasswordListProps) {
   const { toast } = useToast();
 
@@ -57,16 +84,42 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   };
 
   const renderSiteCell = (credential: Credential) => {
+    const expiry = getExpiryStatus(credential.createdAt, credential.expiryMonths);
+    const ExpiryIndicator = () => {
+      if (!expiry.message || expiry.status === 'ok') return null;
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="ml-2 flex-shrink-0">
+              {expiry.status === 'expired' && <AlertTriangle className="h-4 w-4 text-destructive" />}
+              {expiry.status === 'expiring' && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{expiry.message}</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    };
+
     try {
         const urlObject = new URL(credential.url);
         return (
             <>
-                <a href={urlObject.href} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline">{urlObject.hostname}</a>
+                <div className="flex items-center">
+                  <a href={urlObject.href} target="_blank" rel="noopener noreferrer" className="font-medium truncate hover:underline">{urlObject.hostname}</a>
+                  <ExpiryIndicator />
+                </div>
                 <span className="text-sm text-muted-foreground truncate">{urlObject.href}</span>
             </>
         )
     } catch (error) {
-        return <span className="font-medium truncate">{credential.url}</span>
+        return (
+          <div className="flex items-center">
+            <span className="font-medium truncate">{credential.url}</span>
+            <ExpiryIndicator />
+          </div>
+        )
     }
   }
 
