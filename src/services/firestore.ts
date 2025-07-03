@@ -106,12 +106,12 @@ export async function deleteVault(userId: string, vaultId: string): Promise<void
 
 export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const q = query(credentialsCol);
+  const q = query(credentialsCol, orderBy('lastModified', 'desc'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const credentialsFromDb = snapshot.docs.map(doc => {
         const data = doc.data();
-        const key = data.ownerId ? userId : data.ownerId || userId;
+        const key = userId; // Decryption is always done with the current user's key.
         return {
           id: doc.id,
           url: data.url,
@@ -130,7 +130,6 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           ownerName: data.ownerName,
         } as Credential;
     });
-    credentialsFromDb.sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(credentialsFromDb);
   }, (error) => {
     console.error("Error fetching credentials:", error);
@@ -189,6 +188,12 @@ export async function updateCredential(userId: string, id: string, credential: P
   }
   if (dataToUpdate.hasOwnProperty('sharedWith')) {
     dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
+  }
+  if (dataToUpdate.ownerId === undefined) {
+      delete dataToUpdate.ownerId;
+  }
+  if (dataToUpdate.ownerName === undefined) {
+      delete dataToUpdate.ownerName;
   }
 
   await updateDoc(docRef, {
@@ -394,12 +399,12 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
 
 export function getSecureDocuments(userId: string, callback: (documents: SecureDocument[]) => void): () => void {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
-  const q = query(documentsCol);
+  const q = query(documentsCol, orderBy('lastModified', 'desc'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const documents = snapshot.docs.map(doc => {
         const data = doc.data();
-        const key = data.ownerId ? userId : data.ownerId || userId;
+        const key = userId; // Decryption is always done with the current user's key.
         return {
           id: doc.id,
           name: data.name,
@@ -416,7 +421,6 @@ export function getSecureDocuments(userId: string, callback: (documents: SecureD
           ownerName: data.ownerName,
         } as SecureDocument;
     });
-    documents.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(documents);
   }, (error) => {
     console.error("Error fetching secure documents:", error);
@@ -463,6 +467,12 @@ export async function updateSecureDocument(userId: string, id: string, documentD
   }
   if (dataToUpdate.sharedWith !== undefined) {
     dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
+  }
+   if (dataToUpdate.ownerId === undefined) {
+      delete dataToUpdate.ownerId;
+  }
+  if (dataToUpdate.ownerName === undefined) {
+      delete dataToUpdate.ownerName;
   }
 
   await updateDoc(docRef, {
@@ -598,12 +608,12 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const vaultsCol = collection(db, 'users', userId, 'vaults');
 
     const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap] = await Promise.all([
-        getDocs(query(credentialsCol, orderBy('lastModified', 'desc'))),
+        getDocs(query(credentialsCol)),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(sessionsCol, orderBy('lastSeen', 'desc'))),
         getDocs(query(referralsCol, orderBy('timestamp', 'desc'))),
-        getDocs(query(secureDocumentsCol, orderBy('lastModified', 'desc'))),
+        getDocs(query(secureDocumentsCol)),
         getDocs(query(vaultsCol, orderBy('name'))),
     ]);
 
