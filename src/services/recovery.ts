@@ -51,7 +51,6 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     const userDoc = await userDocRef.get();
 
     if (!userDoc.exists) {
-      // This case should be rare if a user exists in Auth but not Firestore
       return { success: false, message: 'User data not found.' };
     }
 
@@ -89,11 +88,40 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     return { success: true, message: 'Recovery email sent successfully.' };
 
   } catch (error: any) {
-    // Check for "user-not-found" error from Firebase Admin.
-    // We log the actual error on the server but don't reveal it to the client.
+    // Check for SendGrid-specific error structure first, as it has a `response` property
+    if (error.response) {
+      const sendGridErrorBody = error.response.body;
+      console.error('SendGrid Error during account recovery:', JSON.stringify(sendGridErrorBody, null, 2));
+      if (sendGridErrorBody?.errors?.length > 0) {
+        const firstError = sendGridErrorBody.errors[0];
+        if (firstError.message.includes('authorization')) {
+           return { 
+              success: false, 
+              message: 'SendGrid Authorization Failed: Please check if your SENDGRID_API_KEY is correct and has the required permissions.' 
+           };
+        }
+        if (firstError.message.includes('does not match a verified Sender Identity')) {
+           return { 
+              success: false, 
+              message: 'SendGrid Sender Error: The "from" email address has not been verified in your SendGrid account. Please complete sender verification.'
+           };
+        }
+        return {
+           success: false,
+           message: `SendGrid Error: ${firstError.message}`
+        };
+      }
+      return {
+          success: false,
+          message: 'An unexpected error occurred while sending the email. Please check the server logs for more details.'
+      };
+    }
+    
+    // Fallback to Firebase/generic error handling
     if (error.code === 'auth/user-not-found') {
       return { success: false, message: 'No user found with this email address.' };
     }
+
     console.error('Error during account recovery:', error);
     return { success: false, message: 'An unexpected error occurred during account recovery.' };
   }
