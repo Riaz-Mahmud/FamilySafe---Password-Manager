@@ -164,28 +164,35 @@ export async function addCredential(userId: string, vaultId: string, credential:
 export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id' | 'createdAt'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
   
-  const encryptedUpdate: { [key: string]: any } = { ...credential };
-  if (credential.username) {
-    encryptedUpdate.username = encryptData(credential.username, userId);
+  // Create a new object with only defined values to prevent Firestore errors
+  const dataToUpdate: { [key: string]: any } = {};
+  for (const key in credential) {
+      if (credential[key as keyof typeof credential] !== undefined) {
+          dataToUpdate[key] = credential[key as keyof typeof credential];
+      }
   }
-  if (credential.password) {
-    encryptedUpdate.password = encryptData(credential.password, userId);
+  
+  if (dataToUpdate.username) {
+    dataToUpdate.username = encryptData(dataToUpdate.username, userId);
   }
-  if (credential.hasOwnProperty('notes')) {
-    encryptedUpdate.notes = encryptData(credential.notes || '', userId);
+  if (dataToUpdate.password) {
+    dataToUpdate.password = encryptData(dataToUpdate.password, userId);
   }
-  if (credential.hasOwnProperty('expiryMonths')) {
-    encryptedUpdate.expiryMonths = credential.expiryMonths || null;
+  if (dataToUpdate.hasOwnProperty('notes')) {
+    dataToUpdate.notes = encryptData(dataToUpdate.notes || '', userId);
   }
-  if (credential.hasOwnProperty('safeForTravel')) {
-    encryptedUpdate.safeForTravel = credential.safeForTravel || false;
+  if (dataToUpdate.hasOwnProperty('expiryMonths')) {
+    dataToUpdate.expiryMonths = dataToUpdate.expiryMonths || null;
   }
-  if (credential.hasOwnProperty('sharedWith')) {
-    encryptedUpdate.sharedWith = credential.sharedWith || [];
+  if (dataToUpdate.hasOwnProperty('safeForTravel')) {
+    dataToUpdate.safeForTravel = dataToUpdate.safeForTravel || false;
+  }
+  if (dataToUpdate.hasOwnProperty('sharedWith')) {
+    dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
   }
 
   await updateDoc(docRef, {
-      ...encryptedUpdate,
+      ...dataToUpdate,
       lastModified: serverTimestamp(),
   });
 }
@@ -439,21 +446,27 @@ export async function addSecureDocument(userId: string, vaultId: string, documen
 export async function updateSecureDocument(userId: string, id: string, documentData: Partial<Omit<SecureDocument, 'id' | 'createdAt'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'secureDocuments', id);
   
-  const encryptedUpdate: { [key: string]: any } = { ...documentData };
+  // Create a new object with only defined values to prevent Firestore errors
+  const dataToUpdate: { [key: string]: any } = {};
+  for (const key in documentData) {
+      if (documentData[key as keyof typeof documentData] !== undefined) {
+          dataToUpdate[key] = documentData[key as keyof typeof documentData];
+      }
+  }
 
   // Only encrypt fields that are present in the update
-  if (documentData.hasOwnProperty('notes')) {
-    encryptedUpdate.notes = encryptData(documentData.notes || '', userId);
+  if (dataToUpdate.notes !== undefined) {
+    dataToUpdate.notes = encryptData(dataToUpdate.notes || '', userId);
   }
-  if (documentData.fileDataUrl) {
-    encryptedUpdate.fileDataUrl = encryptData(documentData.fileDataUrl, userId);
+  if (dataToUpdate.fileDataUrl) {
+    dataToUpdate.fileDataUrl = encryptData(dataToUpdate.fileDataUrl, userId);
   }
-  if (documentData.hasOwnProperty('sharedWith')) {
-    encryptedUpdate.sharedWith = documentData.sharedWith || [];
+  if (dataToUpdate.sharedWith !== undefined) {
+    dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
   }
 
   await updateDoc(docRef, {
-      ...encryptedUpdate,
+      ...dataToUpdate,
       lastModified: serverTimestamp(),
   });
 }
