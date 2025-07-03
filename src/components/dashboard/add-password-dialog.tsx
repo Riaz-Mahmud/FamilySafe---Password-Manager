@@ -23,19 +23,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -45,9 +32,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { FamilyMember, Credential } from '@/types';
-import { Check, ChevronsUpDown, X, Eye, EyeOff } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { Credential } from '@/types';
+import { X, Eye, EyeOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
@@ -58,7 +44,6 @@ const formSchema = z.object({
   username: z.string().min(1, { message: 'Username is required.' }),
   password: z.string().min(1, { message: 'Password is required.' }),
   notes: z.string().optional(),
-  sharedWith: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   expiryMonths: z.number().optional(),
   safeForTravel: z.boolean().optional(),
@@ -67,10 +52,10 @@ const formSchema = z.object({
 type AddPasswordDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddCredential: (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => void;
+  onAddCredential: (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => void;
   onUpdateCredential: (credential: Credential) => void;
-  familyMembers: FamilyMember[];
   credentialToEdit: Credential | null;
+  vaultId: string | null;
 };
 
 export function AddPasswordDialog({
@@ -78,8 +63,8 @@ export function AddPasswordDialog({
   onOpenChange,
   onAddCredential,
   onUpdateCredential,
-  familyMembers,
   credentialToEdit,
+  vaultId,
 }: AddPasswordDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -93,7 +78,6 @@ export function AddPasswordDialog({
       username: '',
       password: '',
       notes: '',
-      sharedWith: [],
       tags: [],
       expiryMonths: 0,
       safeForTravel: false,
@@ -110,7 +94,6 @@ export function AddPasswordDialog({
           username: credentialToEdit.username,
           password: credentialToEdit.password,
           notes: credentialToEdit.notes,
-          sharedWith: credentialToEdit.sharedWith,
           tags: credentialToEdit.tags || [],
           expiryMonths: credentialToEdit.expiryMonths || 0,
           safeForTravel: credentialToEdit.safeForTravel || false,
@@ -121,7 +104,6 @@ export function AddPasswordDialog({
           username: '',
           password: '',
           notes: '',
-          sharedWith: [],
           tags: [],
           expiryMonths: 0,
           safeForTravel: false,
@@ -134,7 +116,6 @@ export function AddPasswordDialog({
     const data = {
         ...values,
         notes: values.notes || '',
-        sharedWith: values.sharedWith || [],
         tags: values.tags || [],
         expiryMonths: values.expiryMonths || 0,
         safeForTravel: values.safeForTravel || false,
@@ -326,90 +307,6 @@ export function AddPasswordDialog({
                 />
                 <FormField
                 control={form.control}
-                name="sharedWith"
-                render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                    <FormLabel>Share with (optional)</FormLabel>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <FormControl>
-                            <Button
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                                'w-full justify-between',
-                                !field.value?.length && 'text-muted-foreground'
-                            )}
-                            >
-                            {field.value && field.value.length > 0
-                                ? `${field.value.length} member(s) selected`
-                                : 'Select family members'}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command>
-                            <CommandInput placeholder="Search members..." />
-                            <CommandList>
-                            <CommandEmpty>No members found.</CommandEmpty>
-                            <CommandGroup>
-                                {familyMembers.map(member => (
-                                <CommandItem
-                                    value={member.name}
-                                    key={member.id}
-                                    onSelect={() => {
-                                      const selectedValues = field.value || [];
-                                      const isSelected = selectedValues.includes(member.id);
-                                      form.setValue(
-                                          'sharedWith',
-                                          isSelected
-                                          ? selectedValues.filter(id => id !== member.id)
-                                          : [...selectedValues, member.id]
-                                      );
-                                    }}
-                                >
-                                    <Check
-                                    className={cn(
-                                        'mr-2 h-4 w-4',
-                                        field.value?.includes(member.id || '') ? 'opacity-100' : 'opacity-0'
-                                    )}
-                                    />
-                                    {member.name}
-                                    {member.status === 'local' && <span className="text-xs text-muted-foreground ml-auto">(Local, no email)</span>}
-                                    {member.status === 'pending' && <span className="text-xs text-muted-foreground ml-auto">(Pending)</span>}
-                                </CommandItem>
-                                ))}
-                            </CommandGroup>
-                            </CommandList>
-                        </Command>
-                        </PopoverContent>
-                    </Popover>
-                    <FormDescription>
-                      Select members to associate this credential with. An active shared copy will only be sent to members with an account.
-                    </FormDescription>
-                    <div className="pt-2 flex flex-wrap gap-2">
-                        {field.value?.map(id => {
-                            const member = familyMembers.find(m => m.id === id);
-                            return member ? (
-                                <Badge variant="secondary" key={member.id} className="gap-1.5">
-                                    {member.name}
-                                    <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberId => memberId !== id))}
-                                    type="button"
-                                    className="rounded-full hover:bg-muted-foreground/20"
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </Badge>
-                            ) : null;
-                        })}
-                    </div>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
                 name="safeForTravel"
                 render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
@@ -435,7 +332,7 @@ export function AddPasswordDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel
             </Button>
-            <Button type="submit" form="add-password-form">{isEditing ? 'Save Changes' : 'Save Credential'}</Button>
+            <Button type="submit" form="add-password-form" disabled={!vaultId}>{isEditing ? 'Save Changes' : 'Save Credential'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

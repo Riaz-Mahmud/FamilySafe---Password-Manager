@@ -14,6 +14,8 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
+  SidebarGroup,
+  SidebarMenuAction,
 } from '@/components/ui/sidebar';
 import {
   Home,
@@ -29,8 +31,10 @@ import {
   History,
   MonitorSmartphone,
   Plane,
-  Share2,
   FolderLock,
+  Trash,
+  GanttChartSquare,
+  BadgeInfo,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -38,7 +42,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -54,7 +58,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { AddFamilyMemberDialog } from '@/components/dashboard/add-family-member-dialog';
 import {
-  getCredentials,
+  getCredentialsForVault,
   addCredential,
   updateCredential,
   deleteCredential,
@@ -66,12 +70,13 @@ import {
   getAuditLogs,
   getDeviceSessions,
   revokeDeviceSession,
-  getSharesForUser,
-  deleteShare,
-  getSecureDocuments,
+  getSecureDocumentsForVault,
   addSecureDocument,
   updateSecureDocument,
   deleteSecureDocument,
+  createVault,
+  getVaults,
+  deleteVault,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -84,39 +89,54 @@ import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { sendInvitationEmailAction, shareCredentialAction } from '@/app/actions';
+import { sendInvitationEmailAction } from '@/app/actions';
 import { AddSecureDocumentDialog } from '@/components/dashboard/add-secure-document-dialog';
 import { SecureDocumentList } from '@/components/dashboard/secure-document-list';
 import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-document-preview-dialog';
+import { AddVaultDialog } from '@/components/dashboard/add-vault-dialog';
 
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-
+  
+  // Data state
+  const [vaults, setVaults] = useState<Vault[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [secureDocuments, setSecureDocuments] = useState<SecureDocument[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
+
+  // UI State
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isItemsLoading, setItemsLoading] = useState(false);
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isTravelModeActive, setTravelModeActive] = useState(false);
+
+  // Dialog state
+  const [isAddPasswordDialogOpen, setAddPasswordDialogOpen] = useState(false);
   const [isAddDocumentDialogOpen, setAddDocumentDialogOpen] = useState(false);
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
-  const [activeMenu, setActiveMenu] = useState('All Passwords');
+  const [isAddVaultDialogOpen, setAddVaultDialogOpen] = useState(false);
+  const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
+  const [isPreviewDialogOpen, setPreviewDialogOpen] = useState(false);
+  
+  // Editing and Deleting state
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
-  const [editingDocument, setEditingDocument] = useState<SecureDocument | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editingDocument, setEditingDocument] = useState<SecureDocument | null>(null);
   const [deleteDocumentTargetId, setDeleteDocumentTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
-  const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
+  const [vaultToDelete, setVaultToDelete] = useState<Vault | null>(null);
+  
+  // Data to pass to dialogs
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
-  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
-  const [isTravelModeActive, setTravelModeActive] = useState(false);
-  const [isPreviewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [documentToPreview, setDocumentToPreview] = useState<SecureDocument | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -135,112 +155,78 @@ export default function DashboardPage() {
   useEffect(() => {
     localStorage.setItem('travelMode', JSON.stringify(isTravelModeActive));
   }, [isTravelModeActive]);
-
+  
+  // Effect for loading primary user data (non-vault specific)
   useEffect(() => {
     if (!user?.uid) {
-      setCredentials([]);
       setFamilyMembers([]);
       setAuditLogs([]);
       setDeviceSessions([]);
-      setSecureDocuments([]);
-      setIsDataLoading(false);
       return;
     }
 
-    setIsDataLoading(true);
-    
-    let loadedCount = 0;
-    const totalToLoad = 5;
-
-    const checkDone = () => {
-      loadedCount++;
-      if (loadedCount === totalToLoad) {
-        setIsDataLoading(false);
-      }
-    };
-
-    const unsubscribeCredentials = getCredentials(user.uid, (creds) => {
-      setCredentials(creds);
-      checkDone();
-    });
-
-    const unsubscribeFamilyMembers = getFamilyMembers(user.uid, (members) => {
-      setFamilyMembers(members);
-      checkDone();
-    });
-
-    const unsubscribeAuditLogs = getAuditLogs(user.uid, (logs) => {
-      setAuditLogs(logs);
-      checkDone();
-    });
-    
+    const unsubscribeFamilyMembers = getFamilyMembers(user.uid, setFamilyMembers);
+    const unsubscribeAuditLogs = getAuditLogs(user.uid, setAuditLogs);
     const currentSessionId = localStorage.getItem('sessionId');
-    const unsubscribeSessions = getDeviceSessions(user.uid, currentSessionId, (sessions) => {
-      setDeviceSessions(sessions);
-      checkDone();
-    });
-
-    const unsubscribeSecureDocuments = getSecureDocuments(user.uid, (docs) => {
-      setSecureDocuments(docs);
-      checkDone();
-    });
-
+    const unsubscribeSessions = getDeviceSessions(user.uid, currentSessionId, setDeviceSessions);
 
     return () => {
-      unsubscribeCredentials();
       unsubscribeFamilyMembers();
       unsubscribeAuditLogs();
       unsubscribeSessions();
-      unsubscribeSecureDocuments();
     };
   }, [user?.uid]);
-
-  // This effect handles the automatic claiming of shared credentials.
+  
+  // Effect for loading vaults and setting up the initial state
   useEffect(() => {
-    if (!user?.uid || !user.email) return;
-
-    const unsubscribeShares = getSharesForUser(user.email, async (shares) => {
-      if (shares.length > 0) {
-        for (const share of shares) {
-          try {
-            // Construct the credential to be added
-            const credentialForRecipient = {
-              ...share.credential,
-              notes: `Shared by ${share.fromName}.\n\n${share.credential.notes || ''}`,
-              sharedWith: [], // A shared credential cannot be re-shared
-              isShared: true,
-              sharedBy: share.fromName,
-              sharedTo: user.email!,
-              ownerUid: share.fromUid,
-              sourceCredentialId: share.sourceCredentialId,
-            };
-            
-            // Add the claimed credential to the user's own list. This will encrypt it.
-            await addCredential(user.uid, credentialForRecipient);
-
-            // Delete the temporary share document
-            await deleteShare(share.id);
-            
-            toast({
-              title: "Credential Received",
-              description: `You received a new shared credential for ${share.credential.url} from ${share.fromName}.`
-            });
-          } catch (error) {
-            console.error("Error claiming share:", error);
-            toast({
-              title: 'Error Receiving Credential',
-              description: 'There was a problem receiving a shared item.',
-              variant: 'destructive',
-            });
-          }
+    if (!user?.uid) {
+      setIsDataLoading(false);
+      return;
+    }
+    
+    setIsDataLoading(true);
+    const unsubscribe = getVaults(user.uid, async (fetchedVaults) => {
+      if (fetchedVaults.length === 0 && !authLoading) {
+        // This is a new user, create a personal vault for them
+        const newVaultId = await createVault(user.uid, 'Personal');
+        // The listener will pick up the new vault, no need to set state here.
+      } else {
+        setVaults(fetchedVaults);
+        if (!selectedVaultId && fetchedVaults.length > 0) {
+          // If no vault is selected, default to the first one
+          setSelectedVaultId(fetchedVaults[0].id);
         }
       }
+      setIsDataLoading(false);
+    });
+    return unsubscribe;
+  }, [user?.uid, authLoading]);
+  
+  // Effect for loading items within the selected vault
+  useEffect(() => {
+    if (!user?.uid || !selectedVaultId) {
+      setCredentials([]);
+      setSecureDocuments([]);
+      return;
+    }
+    
+    setItemsLoading(true);
+    const unsubscribeCreds = getCredentialsForVault(user.uid, selectedVaultId, (creds) => {
+      setCredentials(creds);
+      setItemsLoading(false);
+    });
+    
+    const unsubscribeDocs = getSecureDocumentsForVault(user.uid, selectedVaultId, (docs) => {
+      setSecureDocuments(docs);
+      setItemsLoading(false);
     });
 
     return () => {
-      unsubscribeShares();
+      unsubscribeCreds();
+      unsubscribeDocs();
     };
-  }, [user?.uid, user?.email, toast]);
+  }, [user?.uid, selectedVaultId]);
+
 
   const handleSignOut = async () => {
     if(!user) return;
@@ -249,74 +235,53 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'> & { id: string }, originalSharedWithIds: string[] = []) => {
-      if (!user) return;
-      
-      const newSharedWithIds = credential.sharedWith || [];
-      const addedIds = newSharedWithIds.filter(id => !originalSharedWithIds.includes(id));
-      
-      const sharableMembers = familyMembers.filter(m => 
-          addedIds.includes(m.id) && m.email && m.status !== 'local'
-      );
-
-      const emailsToShareWith = sharableMembers.map(m => m.email!);
-
-      if (emailsToShareWith.length > 0) {
-          const sharerIdentifier = user.displayName || user.email;
-          if (!sharerIdentifier) {
-              toast({
-                  title: "Sharing Failed",
-                  description: "Your user profile could not be identified. Please try again.",
-                  variant: "destructive"
-              });
-              return;
-          }
-
-          const result = await shareCredentialAction({
-              fromUid: user.uid,
-              fromName: sharerIdentifier,
-              toEmails: emailsToShareWith,
-              sourceCredentialId: credential.id,
-              credential: {
-                  url: credential.url,
-                  username: credential.username,
-                  password: credential.password,
-                  notes: credential.notes,
-                  icon: credential.icon,
-                  tags: credential.tags,
-                  expiryMonths: credential.expiryMonths,
-                  safeForTravel: credential.safeForTravel,
-              }
-          });
-
-          if (result.success) {
-              toast({
-                  title: "Credential Shared",
-                  description: `Your credential has been sent to ${emailsToShareWith.length} member(s).`
-              });
-          } else {
-               toast({
-                  title: "Sharing Failed",
-                  description: result.message,
-                  variant: "destructive"
-              });
-          }
-      }
+  // --- Vault Actions ---
+  const handleAddVault = async (name: string) => {
+    if (!user) return;
+    try {
+      const newVaultId = await createVault(user.uid, name);
+      await addAuditLog(user.uid, 'Create Vault', `Created vault named "${name}".`);
+      toast({
+        title: 'Vault Created',
+        description: `The "${name}" vault has been created.`,
+      });
+      setSelectedVaultId(newVaultId);
+    } catch (error) {
+       console.error("Error creating vault:", error);
+       toast({ title: 'Error', description: 'Failed to create vault.', variant: 'destructive' });
+    }
   };
 
-  const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => {
-    if(!user) return;
+  const handleDeleteVault = async () => {
+    if (!vaultToDelete || !user) return;
     try {
-      const savedCredentialId = await addCredential(user.uid, newCredential);
+      await deleteVault(user.uid, vaultToDelete.id);
+      await addAuditLog(user.uid, 'Delete Vault', `Deleted vault named "${vaultToDelete.name}".`);
+      toast({
+        title: 'Vault Deleted',
+        description: `The "${vaultToDelete.name}" vault and all its contents have been permanently deleted.`,
+        variant: 'destructive',
+      });
+      setSelectedVaultId(null); // Will trigger effect to select first available vault
+    } catch (error) {
+       console.error("Error deleting vault:", error);
+       toast({ title: 'Error', description: 'Failed to delete vault.', variant: 'destructive' });
+    } finally {
+      setVaultToDelete(null);
+    }
+  };
+
+
+  // --- Credential Actions ---
+  const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => {
+    if(!user || !selectedVaultId) return;
+    try {
+      await addCredential(user.uid, selectedVaultId, newCredential);
       await addAuditLog(user.uid, 'Create Credential', `Saved credential for ${newCredential.url}.`);
       toast({
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
       });
-      // Handle sharing for new credentials
-      if (newCredential.sharedWith && newCredential.sharedWith.length > 0) {
-        await handleSharing({ ...newCredential, id: savedCredentialId });
-      }
     } catch (error) {
       console.error("Error adding credential:", error);
       toast({ title: 'Error', description: 'Failed to add credential.', variant: 'destructive' });
@@ -326,7 +291,6 @@ export default function DashboardPage() {
   const handleUpdateCredential = async (updatedCredential: Credential) => {
     if(!user) return;
     try {
-      const originalCredential = credentials.find(c => c.id === updatedCredential.id);
       const { id, ...dataToUpdate } = updatedCredential;
       await updateCredential(user.uid, id, dataToUpdate);
       await addAuditLog(user.uid, 'Update Credential', `Updated credential for ${updatedCredential.url}.`);
@@ -334,8 +298,6 @@ export default function DashboardPage() {
         title: 'Credential Updated',
         description: 'The credential has been updated successfully.',
       });
-       // Handle sharing for updated credentials
-      await handleSharing(updatedCredential, originalCredential?.sharedWith);
     } catch (error) {
       console.error("Error updating credential:", error);
       toast({ title: 'Error', description: 'Failed to update credential.', variant: 'destructive' });
@@ -364,10 +326,10 @@ export default function DashboardPage() {
     }
   };
 
-  const handleAddSecureDocument = async (newDocument: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt'>) => {
-    if(!user) return;
+  const handleAddSecureDocument = async (newDocument: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => {
+    if(!user || !selectedVaultId) return;
     try {
-      await addSecureDocument(user.uid, newDocument);
+      await addSecureDocument(user.uid, selectedVaultId, newDocument);
       await addAuditLog(user.uid, 'Create Secure Document', `Saved document named ${newDocument.name}.`);
       toast({
         title: 'Document Added',
@@ -477,7 +439,6 @@ export default function DashboardPage() {
     try {
         const memberToUpdate: Partial<FamilyMember> = { ...updatedMember };
         
-        // If email is removed, it becomes a local member and uid should be cleared.
         if (!memberToUpdate.email) {
             memberToUpdate.status = 'local';
             delete memberToUpdate.uid;
@@ -537,21 +498,19 @@ export default function DashboardPage() {
   };
 
 
-  const openAddDialog = () => {
+  const openAddPasswordDialog = () => {
     setEditingCredential(null);
-    setAddDialogOpen(true);
+    setAddPasswordDialogOpen(true);
   };
 
-  const openEditDialog = (credential: Credential) => {
+  const openEditPasswordDialog = (credential: Credential) => {
     setEditingCredential(credential);
-    setAddDialogOpen(true);
+    setAddPasswordDialogOpen(true);
   };
 
-  const handleDialogChange = (open: boolean) => {
-    if (!open) {
-      setEditingCredential(null);
-    }
-    setAddDialogOpen(open);
+  const handlePasswordDialogChange = (open: boolean) => {
+    if (!open) setEditingCredential(null);
+    setAddPasswordDialogOpen(open);
   };
   
   const openAddDocumentDialog = () => {
@@ -565,9 +524,7 @@ export default function DashboardPage() {
   };
 
   const handleDocumentDialogChange = (open: boolean) => {
-    if (!open) {
-      setEditingDocument(null);
-    }
+    if (!open) setEditingDocument(null);
     setAddDocumentDialogOpen(open);
   };
   
@@ -577,9 +534,7 @@ export default function DashboardPage() {
   };
 
   const handlePreviewDialogChange = (open: boolean) => {
-    if (!open) {
-      setDocumentToPreview(null);
-    }
+    if (!open) setDocumentToPreview(null);
     setPreviewDialogOpen(open);
   };
 
@@ -594,9 +549,7 @@ export default function DashboardPage() {
   };
 
   const handleFamilyDialogChange = (open: boolean) => {
-    if (!open) {
-      setEditingFamilyMember(null);
-    }
+    if (!open) setEditingFamilyMember(null);
     setAddFamilyMemberDialogOpen(open);
   };
   
@@ -605,89 +558,50 @@ export default function DashboardPage() {
     setSendEmailDialogOpen(true);
   };
 
-  const handleSelectFamilyMember = (memberId: string) => {
-    const member = familyMembers.find(m => m.id === memberId);
-    if (!member) {
-        return; // Safety check
-    }
-
-    if (member.status === 'pending') {
-        toast({
-            title: 'Invitation Pending',
-            description: 'This member has not yet accepted their invitation.',
-        });
-    }
-    setSelectedFamilyMemberId(memberId);
-    setActiveMenu('All Passwords');
+  const handleMenuClick = (menu: string) => {
+    setActiveMenu(menu);
     setSearchTerm('');
   };
 
-  const handleMenuClick = (menu: string) => {
-    setActiveMenu(menu);
-    setSelectedFamilyMemberId(null);
+  const handleVaultSelect = (vaultId: string) => {
+    setSelectedVaultId(vaultId);
+    setActiveMenu('All Items');
     setSearchTerm('');
   };
 
   const filteredCredentials = credentials.filter(credential => {
-      // Filter by Travel Mode first
-      if (isTravelModeActive && !credential.safeForTravel) {
-        return false;
-      }
-      
-      // Filter by active menu second, as it's the primary mode
-      if (activeMenu === 'My Passwords') {
-        if (credential.isShared) return false;
-      } else if (activeMenu === 'Shared Passwords') {
-        if (!credential.isShared) return false;
-      }
-
-      // Filter by selected family member if a member is selected
-      if (selectedFamilyMemberId) {
-        const member = familyMembers.find(m => m.id === selectedFamilyMemberId);
-        if (!member) return false; // Safety check
-        // Check if the credential's sharedWith array contains the selected member's ID
-        if (!credential.sharedWith.includes(selectedFamilyMemberId)) {
-          return false;
-        }
-      }
-
-      // Then, filter by search term
+      if (isTravelModeActive && !credential.safeForTravel) return false;
       if (searchTerm) {
           const lowerCaseSearchTerm = searchTerm.toLowerCase();
-          const searchMatch =
-          credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
-          credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
-          (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
-          if (!searchMatch) return false;
+          return credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
+                 credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
+                 (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
       }
-      
       return true;
   });
 
   const filteredDocuments = secureDocuments.filter(doc => {
-      // Filter by search term
       if (searchTerm) {
           const lowerCaseSearchTerm = searchTerm.toLowerCase();
-          const searchMatch =
-          doc.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-          doc.fileType.toLowerCase().includes(lowerCaseSearchTerm);
-          if (!searchMatch) return false;
+          return doc.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                 doc.fileType.toLowerCase().includes(lowerCaseSearchTerm);
       }
-      
       return true;
   });
 
-  if (authLoading) {
+  if (authLoading || isDataLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
+  
+  const selectedVault = vaults.find(v => v.id === selectedVaultId);
 
   const renderContent = () => {
-    if (isDataLoading) {
-      return (
+    if (isItemsLoading) {
+       return (
         <div className="space-y-4">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
@@ -696,19 +610,33 @@ export default function DashboardPage() {
         </div>
       );
     }
-  
+    
     switch (activeMenu) {
+      case 'All Items':
+        return (
+          <div className="space-y-8">
+            <PasswordList
+              credentials={filteredCredentials}
+              onEdit={openEditPasswordDialog}
+              onDelete={setDeleteTargetId}
+              onSend={openSendEmailDialog}
+              isTravelModeActive={isTravelModeActive}
+            />
+            <SecureDocumentList
+              documents={filteredDocuments}
+              onEdit={openEditDocumentDialog}
+              onDelete={setDeleteDocumentTargetId}
+              onPreview={openPreviewDialog}
+            />
+          </div>
+        );
       case 'All Passwords':
-      case 'My Passwords':
-      case 'Shared Passwords':
         return (
           <PasswordList
             credentials={filteredCredentials}
-            familyMembers={familyMembers}
-            onEdit={openEditDialog}
+            onEdit={openEditPasswordDialog}
             onDelete={setDeleteTargetId}
             onSend={openSendEmailDialog}
-            onMemberSelect={handleSelectFamilyMember}
             isTravelModeActive={isTravelModeActive}
           />
         );
@@ -722,16 +650,9 @@ export default function DashboardPage() {
           />
         );
       case 'Family Members':
-        return (
-          <FamilyMembersList
-            familyMembers={familyMembers}
-            onEdit={openEditFamilyMemberDialog}
-            onDelete={setDeleteFamilyMemberTargetId}
-            onMemberSelect={handleSelectFamilyMember}
-          />
-        );
+        return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} />;
       case 'Password Health Report':
-        return <PasswordHealthReportPage credentials={credentials} onEditCredential={openEditDialog} />;
+        return <PasswordHealthReportPage credentials={credentials} onEditCredential={openEditPasswordDialog} />;
       case 'Audit Logs':
         return <AuditLogsPage logs={auditLogs} />;
       case 'Device Management':
@@ -745,12 +666,8 @@ export default function DashboardPage() {
     }
   };
 
-  const activeFamilyMember = selectedFamilyMemberId
-    ? familyMembers.find((m) => m.id === selectedFamilyMemberId)
-    : null;
-
-  const pageTitle = activeFamilyMember
-    ? `Passwords Shared with ${activeFamilyMember.name}`
+  const pageTitle = activeMenu === 'All Items' 
+    ? selectedVault?.name || 'Vault' 
     : activeMenu;
 
   return (
@@ -761,104 +678,77 @@ export default function DashboardPage() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('All Passwords')}
-                isActive={activeMenu === 'All Passwords' && !selectedFamilyMemberId}
-                tooltip="All Passwords"
-              >
-                <Home />
-                All Passwords
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Secure Documents')}
-                isActive={activeMenu === 'Secure Documents'}
-                tooltip="Secure Documents"
-              >
-                <FolderLock />
-                Secure Documents
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('My Passwords')}
-                isActive={activeMenu === 'My Passwords'}
-                tooltip="My Passwords"
-              >
-                <Shield />
-                My Passwords
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Shared Passwords')}
-                isActive={activeMenu === 'Shared Passwords'}
-                tooltip="Shared Passwords"
-              >
-                <Share2 />
-                Shared Passwords
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Family Members')}
-                isActive={activeMenu === 'Family Members'}
-                tooltip="Family Members"
-              >
-                <Users />
-                Family Members
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Password Health Report')}
-                isActive={activeMenu === 'Password Health Report'}
-                tooltip="Password Health Report"
-              >
-                <ShieldCheck />
-                Password Health Report
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Audit Logs')}
-                isActive={activeMenu === 'Audit Logs'}
-                tooltip="Audit Logs"
-              >
-                <History />
-                Audit Logs
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Device Management')}
-                isActive={activeMenu === 'Device Management'}
-                tooltip="Device Management"
-              >
-                <MonitorSmartphone />
-                Device Management
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <SidebarGroup>
+              <SidebarGroupLabel>Categories</SidebarGroupLabel>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('All Items')} isActive={activeMenu === 'All Items'} tooltip="All Items in Vault">
+                  <GanttChartSquare /> All Items
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('All Passwords')} isActive={activeMenu === 'All Passwords'} tooltip="Passwords in Vault">
+                  <Shield /> Passwords
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Secure Documents')} isActive={activeMenu === 'Secure Documents'} tooltip="Documents in Vault">
+                  <FolderLock /> Documents
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarGroup>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel>Vaults</SidebarGroupLabel>
+              <SidebarMenuAction onClick={() => setAddVaultDialogOpen(true)} tooltip="Create New Vault">
+                <Plus />
+              </SidebarMenuAction>
+              {vaults.map((vault) => (
+                <SidebarMenuItem key={vault.id}>
+                  <SidebarMenuButton onClick={() => handleVaultSelect(vault.id)} isActive={selectedVaultId === vault.id} tooltip={vault.name}>
+                    <Home /> {vault.name}
+                  </SidebarMenuButton>
+                  <SidebarMenuAction onClick={(e) => {e.stopPropagation(); setVaultToDelete(vault)}} tooltip="Delete Vault" className="text-muted-foreground hover:text-destructive">
+                    <Trash />
+                  </SidebarMenuAction>
+                </SidebarMenuItem>
+              ))}
+            </SidebarGroup>
+             <SidebarSeparator />
+             <SidebarGroup>
+              <SidebarGroupLabel>Security & Management</SidebarGroupLabel>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Family Members')} isActive={activeMenu === 'Family Members'} tooltip="Family Members">
+                  <Users /> Family Members
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Password Health Report')} isActive={activeMenu === 'Password Health Report'} tooltip="Password Health Report">
+                  <ShieldCheck /> Password Health
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Audit Logs')} isActive={activeMenu === 'Audit Logs'} tooltip="Audit Logs">
+                  <History /> Audit Logs
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Device Management')} isActive={activeMenu === 'Device Management'} tooltip="Device Management">
+                  <MonitorSmartphone /> Device Management
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarGroup>
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => handleMenuClick('Support')} isActive={activeMenu === 'Support'} tooltip="Support">
-                <LifeBuoy />
-                Support
+                <LifeBuoy /> Support
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                onClick={() => handleMenuClick('Settings')}
-                isActive={activeMenu === 'Settings'}
-                tooltip="Settings"
-              >
-                <Settings />
-                Settings
+              <SidebarMenuButton onClick={() => handleMenuClick('Settings')} isActive={activeMenu === 'Settings'} tooltip="Settings">
+                <Settings /> Settings
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -898,34 +788,24 @@ export default function DashboardPage() {
         <div className="p-4 sm:p-6 lg:p-8 flex flex-col h-screen">
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
-            {activeMenu === 'All Passwords' || activeMenu === 'My Passwords' || activeMenu === 'Shared Passwords' ? (
+            
+            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') ? (
               <>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search passwords by site, username, or tag..."
+                    placeholder="Search this vault..."
                     className="pl-10 w-full max-w-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={!selectedVaultId}
                   />
                 </div>
-                <Button onClick={openAddDialog} className="font-semibold">
+                <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents'}>
                   <Plus className="h-5 w-5 md:mr-2" />
                   <span className="hidden md:inline">Add Credential</span>
                 </Button>
-              </>
-            ) : activeMenu === 'Secure Documents' ? (
-              <>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search documents by name or file type..."
-                    className="pl-10 w-full max-w-sm"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Button onClick={openAddDocumentDialog} className="font-semibold">
+                <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords'}>
                   <Plus className="h-5 w-5 md:mr-2" />
                   <span className="hidden md:inline">Add Document</span>
                 </Button>
@@ -943,18 +823,26 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{pageTitle}</h1>
-            {renderContent()}
+            {selectedVaultId ? renderContent() : (
+              <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
+                <BadgeInfo className="h-16 w-16 text-muted-foreground mb-4" />
+                <h2 className="text-2xl font-headline font-bold">No Vault Selected</h2>
+                <p className="text-muted-foreground mt-2">
+                  Select a vault from the sidebar to view its items, or create a new one.
+                </p>
+              </div>
+            )}
           </main>
         </div>
       </SidebarInset>
 
       <AddPasswordDialog
-        open={isAddDialogOpen}
-        onOpenChange={handleDialogChange}
+        open={isAddPasswordDialogOpen}
+        onOpenChange={handlePasswordDialogChange}
         onAddCredential={handleAddCredential}
         onUpdateCredential={handleUpdateCredential}
-        familyMembers={familyMembers}
         credentialToEdit={editingCredential}
+        vaultId={selectedVaultId}
       />
 
       <AddSecureDocumentDialog
@@ -963,6 +851,7 @@ export default function DashboardPage() {
         onAddDocument={handleAddSecureDocument}
         onUpdateDocument={handleUpdateSecureDocument}
         documentToEdit={editingDocument}
+        vaultId={selectedVaultId}
       />
 
       <AddFamilyMemberDialog
@@ -971,6 +860,12 @@ export default function DashboardPage() {
         onAddFamilyMember={handleAddFamilyMember}
         onUpdateFamilyMember={handleUpdateFamilyMember}
         familyMemberToEdit={editingFamilyMember}
+      />
+
+      <AddVaultDialog
+        open={isAddVaultDialogOpen}
+        onOpenChange={setAddVaultDialogOpen}
+        onAddVault={handleAddVault}
       />
 
       <SendEmailDialog
@@ -1034,6 +929,23 @@ export default function DashboardPage() {
             <AlertDialogCancel onClick={() => setDeleteFamilyMemberTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteFamilyMember} className="bg-destructive hover:bg-destructive/90">
               Remove Member
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!vaultToDelete} onOpenChange={(open) => !open && setVaultToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{vaultToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this vault and all credentials and documents inside it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setVaultToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteVault} className="bg-destructive hover:bg-destructive/90">
+              Delete Vault
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

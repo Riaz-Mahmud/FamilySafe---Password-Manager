@@ -42,9 +42,10 @@ const formSchema = z.object({
 type AddSecureDocumentDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddDocument: (document: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt'>) => void;
+  onAddDocument: (document: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => void;
   onUpdateDocument: (document: SecureDocument) => void;
   documentToEdit: SecureDocument | null;
+  vaultId: string | null;
 };
 
 export function AddSecureDocumentDialog({
@@ -53,6 +54,7 @@ export function AddSecureDocumentDialog({
   onAddDocument,
   onUpdateDocument,
   documentToEdit,
+  vaultId,
 }: AddSecureDocumentDialogProps) {
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
@@ -253,7 +255,7 @@ export function AddSecureDocumentDialog({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" form="add-document-form">
+          <Button type="submit" form="add-document-form" disabled={!vaultId}>
             {isEditing ? 'Save Changes' : 'Save Document'}
           </Button>
         </DialogFooter>

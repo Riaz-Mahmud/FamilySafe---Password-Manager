@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
 import {
   collection,
   addDoc,
@@ -16,6 +16,7 @@ import {
   getDoc,
   where,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '@/lib/crypto';
 
@@ -27,109 +28,88 @@ function formatTimestamp(timestamp: Timestamp | undefined): string {
 }
 
 
-// --- Credentials & Revocations ---
+// --- Vaults ---
 
-/**
- * Checks a list of shared credentials against the revocations collection.
- * @param credentialsToCheck An array of credentials that are copies from another user.
- * @returns A Set containing the sourceCredentialId of any credential that has been revoked by its owner.
- */
-export async function getRevokedSourceIds(credentialsToCheck: Credential[]): Promise<Set<string>> {
-  if (credentialsToCheck.length === 0) {
-    return new Set();
-  }
-
-  const revokedIds = new Set<string>();
-  const checksByOwner = new Map<string, string[]>();
-
-  // Group checks by owner to reduce the number of queries needed.
-  for (const cred of credentialsToCheck) {
-    if (cred.ownerUid && cred.sourceCredentialId) {
-      if (!checksByOwner.has(cred.ownerUid)) {
-        checksByOwner.set(cred.ownerUid, []);
-      }
-      checksByOwner.get(cred.ownerUid)!.push(cred.sourceCredentialId);
-    }
-  }
-
-  // Firestore 'in' queries support up to 30 elements per query.
-  // We'll iterate through each owner's list and chunk the queries if necessary.
-  const revocationQueries = Array.from(checksByOwner.entries()).map(async ([ownerUid, sourceIds]) => {
-    for (let i = 0; i < sourceIds.length; i += 30) {
-      const chunk = sourceIds.slice(i, i + 30);
-      const q = query(
-        collection(db, 'revocations'),
-        where('ownerUid', '==', ownerUid),
-        where('sourceCredentialId', 'in', chunk)
-      );
-      const snapshot = await getDocs(q);
-      snapshot.forEach(doc => {
-        revokedIds.add(doc.data().sourceCredentialId);
-      });
-    }
-  });
-
-  await Promise.all(revocationQueries);
-  return revokedIds;
-}
-
-export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
-  const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const q = query(credentialsCol, orderBy('lastModified', 'desc'));
+export function getVaults(userId: string, callback: (vaults: Vault[]) => void): () => void {
+  const vaultsCol = collection(db, 'users', userId, 'vaults');
+  const q = query(vaultsCol, orderBy('name'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
-    (async () => {
-      const credentialsFromDb: Credential[] = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            url: data.url,
-            username: decryptData(data.username, userId),
-            password: decryptData(data.password, userId),
-            notes: decryptData(data.notes, userId),
-            lastModified: formatTimestamp(data.lastModified),
-            createdAt: formatTimestamp(data.createdAt),
-            sharedWith: data.sharedWith || [],
-            icon: data.icon,
-            tags: data.tags || [],
-            expiryMonths: data.expiryMonths,
-            safeForTravel: data.safeForTravel || false,
-            isShared: data.isShared || false,
-            sharedBy: data.sharedBy || undefined,
-            sharedTo: data.sharedTo || undefined,
-            ownerUid: data.ownerUid || undefined,
-            sourceCredentialId: data.sourceCredentialId || undefined,
-          } as Credential;
-      });
+    const vaultsFromDb = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as Vault));
+    callback(vaultsFromDb);
+  }, (error) => {
+    console.error("Error fetching vaults:", error);
+    callback([]);
+  });
+  return unsubscribe;
+}
 
-      const ownCredentials = credentialsFromDb.filter(c => !c.isShared);
-      const sharedCredentials = credentialsFromDb.filter(c => c.isShared);
+export async function createVault(userId: string, name: string): Promise<string> {
+  const vaultsCol = collection(db, 'users', userId, 'vaults');
+  const docRef = await addDoc(vaultsCol, {
+    name,
+    ownerUid: userId,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
 
-      const revokedSourceIds = await getRevokedSourceIds(sharedCredentials);
+export async function updateVault(userId: string, vaultId: string, name: string): Promise<void> {
+  const vaultRef = doc(db, 'users', userId, 'vaults', vaultId);
+  await updateDoc(vaultRef, { name });
+}
 
-      const validSharedCredentials: Credential[] = [];
-      const staleCredentialsToDelete: string[] = [];
+export async function deleteVault(userId: string, vaultId: string): Promise<void> {
+  const batch = writeBatch(db);
 
-      for (const cred of sharedCredentials) {
-        if (cred.sourceCredentialId && revokedSourceIds.has(cred.sourceCredentialId)) {
-          staleCredentialsToDelete.push(cred.id);
-        } else {
-          validSharedCredentials.push(cred);
-        }
-      }
+  // Delete all credentials in the vault
+  const credsCol = collection(db, 'users', userId, 'credentials');
+  const credsQuery = query(credsCol, where('vaultId', '==', vaultId));
+  const credsSnapshot = await getDocs(credsQuery);
+  credsSnapshot.forEach(doc => batch.delete(doc.ref));
 
-      const finalCredentials = [...ownCredentials, ...validSharedCredentials].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-      callback(finalCredentials);
+  // Delete all secure documents in the vault
+  const docsCol = collection(db, 'users', userId, 'secureDocuments');
+  const docsQuery = query(docsCol, where('vaultId', '==', vaultId));
+  const docsSnapshot = await getDocs(docsQuery);
+  docsSnapshot.forEach(doc => batch.delete(doc.ref));
+  
+  // Delete the vault document itself
+  const vaultRef = doc(db, 'users', userId, 'vaults', vaultId);
+  batch.delete(vaultRef);
 
-      // Asynchronously delete stale credentials in the background.
-      if (staleCredentialsToDelete.length > 0) {
-        console.log(`Found ${staleCredentialsToDelete.length} revoked shared credential(s) to remove.`);
-        for (const id of staleCredentialsToDelete) {
-          // This deletion will trigger onSnapshot again, updating the UI.
-          deleteDoc(doc(db, 'users', userId, 'credentials', id)).catch(err => console.error(`Failed to delete revoked credential ${id}`, err));
-        }
-      }
-    })();
+  await batch.commit();
+}
+
+
+// --- Credentials ---
+
+export function getCredentialsForVault(userId: string, vaultId: string, callback: (credentials: Credential[]) => void): () => void {
+  const credentialsCol = collection(db, 'users', userId, 'credentials');
+  const q = query(credentialsCol, where('vaultId', '==', vaultId), orderBy('lastModified', 'desc'));
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const credentialsFromDb = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          url: data.url,
+          username: decryptData(data.username, userId),
+          password: decryptData(data.password, userId),
+          notes: decryptData(data.notes, userId),
+          lastModified: formatTimestamp(data.lastModified),
+          createdAt: formatTimestamp(data.createdAt),
+          icon: data.icon,
+          tags: data.tags || [],
+          expiryMonths: data.expiryMonths,
+          safeForTravel: data.safeForTravel || false,
+          vaultId: data.vaultId,
+        } as Credential;
+    });
+    callback(credentialsFromDb);
   }, (error) => {
     console.error("Error fetching credentials:", error);
     callback([]);
@@ -138,22 +118,18 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
   return unsubscribe;
 }
 
-export async function addCredential(userId: string, credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>): Promise<string> {
+export async function addCredential(userId: string, vaultId: string, credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>): Promise<string> {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
   
   const encryptedCredential = {
     ...credential,
+    vaultId,
     username: encryptData(credential.username, userId),
     password: encryptData(credential.password, userId),
     notes: encryptData(credential.notes || '', userId),
     tags: credential.tags || [],
     expiryMonths: credential.expiryMonths || null,
     safeForTravel: credential.safeForTravel || false,
-    isShared: credential.isShared || false,
-    sharedBy: credential.sharedBy || null,
-    sharedTo: credential.sharedTo || null,
-    ownerUid: credential.ownerUid || null,
-    sourceCredentialId: credential.sourceCredentialId || null,
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
@@ -181,16 +157,6 @@ export async function updateCredential(userId: string, id: string, credential: P
   if (credential.hasOwnProperty('safeForTravel')) {
     encryptedUpdate.safeForTravel = credential.safeForTravel || false;
   }
-  if (credential.hasOwnProperty('isShared')) {
-    encryptedUpdate.isShared = credential.isShared || false;
-  }
-  if (credential.hasOwnProperty('sharedBy')) {
-    encryptedUpdate.sharedBy = credential.sharedBy || null;
-  }
-  if (credential.hasOwnProperty('sharedTo')) {
-    encryptedUpdate.sharedTo = credential.sharedTo || null;
-  }
-
 
   await updateDoc(docRef, {
       ...encryptedUpdate,
@@ -200,18 +166,6 @@ export async function updateCredential(userId: string, id: string, credential: P
 
 export async function deleteCredential(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
-  
-  // Create a revocation record *before* deleting the document.
-  // This notifies any recipients that the original credential has been deleted.
-  // This applies to all deletion, not just shared items, for simplicity.
-  // If the item wasn't shared, the revocation record is harmless.
-  const revocationData = {
-    ownerUid: userId,
-    sourceCredentialId: id,
-    timestamp: serverTimestamp(),
-  };
-  await addDoc(collection(db, 'revocations'), revocationData);
-
   await deleteDoc(docRef);
 }
 
@@ -403,9 +357,9 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
 
 // --- Secure Documents ---
 
-export function getSecureDocuments(userId: string, callback: (documents: SecureDocument[]) => void): () => void {
+export function getSecureDocumentsForVault(userId: string, vaultId: string, callback: (documents: SecureDocument[]) => void): () => void {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
-  const q = query(documentsCol, orderBy('lastModified', 'desc'));
+  const q = query(documentsCol, where('vaultId', '==', vaultId), orderBy('lastModified', 'desc'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const documents = snapshot.docs.map(doc => {
@@ -420,6 +374,7 @@ export function getSecureDocuments(userId: string, callback: (documents: SecureD
           icon: data.icon,
           lastModified: formatTimestamp(data.lastModified),
           createdAt: formatTimestamp(data.createdAt),
+          vaultId: data.vaultId,
         } as SecureDocument;
     });
     callback(documents);
@@ -431,11 +386,12 @@ export function getSecureDocuments(userId: string, callback: (documents: SecureD
   return unsubscribe;
 }
 
-export async function addSecureDocument(userId: string, documentData: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt'>): Promise<string> {
+export async function addSecureDocument(userId: string, vaultId: string, documentData: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>): Promise<string> {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
   
   const encryptedDocument = {
     ...documentData,
+    vaultId,
     notes: encryptData(documentData.notes, userId),
     fileDataUrl: encryptData(documentData.fileDataUrl, userId),
     createdAt: serverTimestamp(),
@@ -555,7 +511,7 @@ export async function deleteUserData(userId: string): Promise<void> {
   }
   
   // Delete all subcollections under the user's document.
-  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments'];
+  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments', 'vaults'];
   const deleteSubCollectionPromises = subcollections.map(sub => deleteCollection(`users/${userId}/${sub}`));
   await Promise.all(deleteSubCollectionPromises);
 
@@ -574,14 +530,16 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const sessionsCol = collection(db, 'users', userId, 'sessions');
     const referralsCol = collection(db, 'users', userId, 'successful_referrals');
     const secureDocumentsCol = collection(db, 'users', userId, 'secureDocuments');
+    const vaultsCol = collection(db, 'users', userId, 'vaults');
 
-    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap] = await Promise.all([
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap] = await Promise.all([
         getDocs(query(credentialsCol, orderBy('lastModified', 'desc'))),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(sessionsCol, orderBy('lastSeen', 'desc'))),
         getDocs(query(referralsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(secureDocumentsCol, orderBy('lastModified', 'desc'))),
+        getDocs(query(vaultsCol, orderBy('name'))),
     ]);
 
     const credentials = credentialsSnap.docs.map(doc => {
@@ -594,11 +552,10 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             notes: decryptData(data.notes, userId),
             lastModified: formatTimestamp(data.lastModified),
             createdAt: formatTimestamp(data.createdAt),
-            sharedWith: data.sharedWith || [],
             icon: data.icon,
             tags: data.tags || [],
             expiryMonths: data.expiryMonths,
-            sharedBy: data.sharedBy,
+            vaultId: data.vaultId,
         };
     });
     
@@ -614,6 +571,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             fileSize: data.fileSize,
             lastModified: formatTimestamp(data.lastModified),
             createdAt: formatTimestamp(data.createdAt),
+            vaultId: data.vaultId,
         };
     });
 
@@ -647,8 +605,11 @@ export async function getUserDataForExport(userId: string): Promise<object> {
            timestamp: formatTimestamp(data.timestamp),
         };
     });
+
+    const vaults = vaultsSnap.docs.map(doc => ({id: doc.id, ...doc.data()}));
     
     return {
+        vaults,
         credentials,
         secureDocuments,
         familyMembers,
@@ -656,38 +617,4 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         deviceSessions,
         referrals,
     };
-}
-
-
-// --- Sharing ---
-
-export async function createShare(shareData: { fromUid: string, fromName: string, toEmail: string, credential: any, sourceCredentialId: string }): Promise<void> {
-  const sharesCol = collection(db, 'shares');
-  await addDoc(sharesCol, {
-    ...shareData,
-    createdAt: serverTimestamp(),
-  });
-}
-
-export function getSharesForUser(email: string, callback: (shares: any[]) => void): () => void {
-  const sharesCol = collection(db, 'shares');
-  const q = query(sharesCol, where("toEmail", "==", email));
-  
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const shares = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-    }));
-    callback(shares);
-  }, (error) => {
-    console.error("Error fetching shares:", error);
-    callback([]);
-  });
-
-  return unsubscribe;
-}
-
-export async function deleteShare(shareId: string): Promise<void> {
-  const docRef = doc(db, 'shares', shareId);
-  await deleteDoc(docRef);
 }

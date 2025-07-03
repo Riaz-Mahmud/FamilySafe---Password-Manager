@@ -22,23 +22,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle, Plane } from 'lucide-react';
-import type { Credential, FamilyMember } from '@/types';
+import type { Credential } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { addMonths, differenceInDays, format, isPast } from 'date-fns';
 import { useState } from 'react';
 
 type PasswordListProps = {
   credentials: Credential[];
-  familyMembers: FamilyMember[];
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
   onSend: (credential: Credential) => void;
-  onMemberSelect: (id: string) => void;
   isTravelModeActive?: boolean;
 };
 
@@ -76,7 +73,7 @@ const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) =>
   return { status: 'ok', message: `Expires on ${format(expiryDate, 'MMM d, yyyy')}` };
 };
 
-export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect, isTravelModeActive }: PasswordListProps) {
+export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelModeActive }: PasswordListProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -138,62 +135,15 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     const title = isTravelModeActive ? "No Passwords for Travel" : "No Passwords Found";
     const description = isTravelModeActive 
         ? "Mark credentials as 'Safe for Travel' to see them here."
-        : 'Click "Add Credential" to save your first password.';
+        : 'This vault is empty. Click "Add Credential" to save a password here.';
     
     return (
-        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
+        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full min-h-[200px]">
             <IconComponent className="h-16 w-16 text-muted-foreground mb-4" />
             <h2 className="text-2xl font-headline font-bold">{title}</h2>
             <p className="text-muted-foreground mt-2">{description}</p>
         </div>
     );
-  }
-
-  const renderSharedWith = (credential: Credential) => {
-    const sharedWithIds = credential.sharedWith || [];
-    
-    if (credential.isShared) {
-        const sharerName = credential.sharedBy;
-        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{sharerName ? `Shared by ${sharerName}` : 'Shared with you'}</Badge>;
-    }
-
-    if (sharedWithIds.length === 0) {
-        return <Badge variant="outline">Only You</Badge>;
-    }
-
-    const sharedWithMembers = familyMembers.filter(member =>
-      sharedWithIds.includes(member.id)
-    );
-    
-    if (sharedWithMembers.length > 0) {
-      return (
-        <div className="flex items-center">
-          {sharedWithMembers.slice(0, 3).map((member) => (
-            <Tooltip key={member.id}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onMemberSelect(member.id)}
-                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  aria-label={`View passwords shared with ${member.name}`}
-                >
-                  <Avatar className={`h-8 w-8 border-2 border-background -ml-2 first:ml-0`}>
-                    <AvatarImage src={member.avatar} alt={member.name} />
-                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>View passwords shared with {member.name}</TooltipContent>
-            </Tooltip>
-          ))}
-          {sharedWithMembers.length > 3 && (
-              <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background -ml-2 flex items-center justify-center text-xs font-semibold">
-                  +{sharedWithMembers.length - 3}
-              </div>
-          )}
-        </div>
-      )
-    }
-    return <Badge variant="outline">Only You</Badge>
   }
 
   const renderTags = (credential: Credential) => {
@@ -233,7 +183,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
+                                    <DropdownMenuItem onClick={() => onEdit(credential)}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
@@ -245,7 +195,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                     <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
                                     onClick={() => onDelete(credential.id)}
-                                    disabled={credential.isShared}
                                     >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -274,13 +223,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                             </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground">Sharing</p>
-                            <div className="pt-1">
-                                {renderSharedWith(credential)}
-                            </div>
-                        </div>
-
                         <Button
                             variant="outline"
                             size="sm"
@@ -304,7 +246,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
               <TableHead className="w-[40%]">Site / Application</TableHead>
               <TableHead className="w-[30%]">Username</TableHead>
               <TableHead>Actions</TableHead>
-              <TableHead>Sharing</TableHead>
               <TableHead className="text-right w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -357,9 +298,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                       <TooltipContent>Copy password</TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell>
-                    {renderSharedWith(credential)}
-                  </TableCell>
                   <TableCell className="text-right">
                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -368,7 +306,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                           </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
+                          <DropdownMenuItem onClick={() => onEdit(credential)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -380,7 +318,6 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => onDelete(credential.id)}
-                            disabled={credential.isShared}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete

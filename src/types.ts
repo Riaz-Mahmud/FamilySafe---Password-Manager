@@ -1,4 +1,10 @@
 
+export interface Vault {
+  id: string;
+  name: string;
+  ownerUid: string;
+}
+
 export interface Credential {
   id: string;
   url: string;
@@ -7,16 +13,11 @@ export interface Credential {
   notes: string;
   lastModified: string;
   createdAt: string;
-  sharedWith: string[]; // array of family member IDs
   icon: string;
   tags: string[];
   expiryMonths?: number;
   safeForTravel?: boolean;
-  isShared?: boolean;
-  sharedBy?: string; // Name of the user who shared it
-  sharedTo?: string;
-  ownerUid?: string;
-  sourceCredentialId?: string;
+  vaultId: string;
 }
 
 export interface FamilyMember {
@@ -53,4 +54,5 @@ export interface SecureDocument {
   lastModified: string;
   createdAt: string;
   icon: string; // lucide icon name
+  vaultId: string;
 }
