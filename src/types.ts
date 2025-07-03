@@ -18,9 +18,9 @@ export interface Credential {
 export interface FamilyMember {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   avatar: string; // URL to avatar image
-  status: 'pending' | 'active';
+  status: 'pending' | 'active' | 'local';
   uid?: string; // The user ID of the family member after they sign up
 }
 

@@ -132,18 +132,19 @@ export function getFamilyMembers(userId: string, callback: (familyMembers: Famil
   return unsubscribe;
 }
 
-export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id'>): Promise<void> {
+export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id' | 'uid'>): Promise<void> {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   const familyMemberDocRef = await addDoc(familyMembersCol, member);
 
-  // ALWAYS add to the global invitations collection for lookup on signup/login.
-  // This allows us to link accounts even if an invitation email isn't sent.
-  const invitationsCol = collection(db, 'invitations');
-  await addDoc(invitationsCol, {
-    referrerId: userId,
-    inviteeEmail: member.email,
-    familyMemberDocId: familyMemberDocRef.id,
-  });
+  // If there's an email, it's an invitation. Local members don't get added to the invitations collection.
+  if (member.email) {
+    const invitationsCol = collection(db, 'invitations');
+    await addDoc(invitationsCol, {
+      referrerId: userId,
+      inviteeEmail: member.email,
+      familyMemberDocId: familyMemberDocRef.id,
+    });
+  }
 }
 
 export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {
@@ -159,8 +160,8 @@ export async function deleteFamilyMember(userId: string, id: string): Promise<vo
     const memberData = docSnap.data();
     await deleteDoc(docRef);
 
-    // If they were pending, also delete the corresponding invitation document
-    if (memberData.status === 'pending') {
+    // If they were pending or active (i.e., had an email), also delete the corresponding invitation document if it exists
+    if (memberData.status !== 'local' && memberData.email) {
         const invitationsCol = collection(db, 'invitations');
         // We can find the invitation using the familyMemberDocId
         const q = query(invitationsCol, where("familyMemberDocId", "==", id));

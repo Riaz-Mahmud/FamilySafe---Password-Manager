@@ -358,7 +358,9 @@ export function AddPasswordDialog({
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
+                                    disabled={member.status === 'local'}
                                     onSelect={() => {
+                                      if (member.status === 'local') return;
                                       const selectedValues = field.value || [];
                                       const isSelected = selectedValues.includes(member.id);
                                       form.setValue(
@@ -376,7 +378,8 @@ export function AddPasswordDialog({
                                     )}
                                     />
                                     {member.name}
-                                    {member.status !== 'active' && <span className="text-xs text-muted-foreground ml-auto">(Pending)</span>}
+                                    {member.status === 'pending' && <span className="text-xs text-muted-foreground ml-auto">(Pending)</span>}
+                                    {member.status === 'local' && <span className="text-xs text-muted-foreground ml-auto">(Local)</span>}
                                 </CommandItem>
                                 ))}
                             </CommandGroup>
@@ -385,7 +388,7 @@ export function AddPasswordDialog({
                         </PopoverContent>
                     </Popover>
                     <FormDescription>
-                      Select family members to share with. Active members will get access immediately.
+                      Select family members to share with. Active members will get access immediately. Local members cannot be selected.
                     </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
                         {field.value?.map(id => {

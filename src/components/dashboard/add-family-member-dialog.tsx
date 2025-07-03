@@ -32,14 +32,14 @@ import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(1, { message: 'Name is required.' }),
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+  email: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
   sendInvite: z.boolean().default(true).optional(),
 });
 
 type AddFamilyMemberDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddFamilyMember: (member: Omit<FamilyMember, 'id' | 'avatar'> & { sendInvite?: boolean }) => void;
+  onAddFamilyMember: (member: Omit<FamilyMember, 'id' | 'avatar' | 'uid'> & { sendInvite?: boolean }) => void;
   onUpdateFamilyMember: (member: FamilyMember) => void;
   familyMemberToEdit: FamilyMember | null;
 };
@@ -93,7 +93,7 @@ export function AddFamilyMemberDialog({
       if (familyMemberToEdit) {
         form.reset({
           name: familyMemberToEdit.name,
-          email: familyMemberToEdit.email,
+          email: familyMemberToEdit.email || '',
           sendInvite: false, // Don't default to true when editing
         });
       } else {
@@ -112,10 +112,16 @@ export function AddFamilyMemberDialog({
       onUpdateFamilyMember({
         ...familyMemberToEdit,
         name: values.name,
-        email: values.email,
+        email: values.email || undefined,
+        status: values.email ? (familyMemberToEdit.uid ? 'active' : 'pending') : 'local',
       });
     } else {
-      onAddFamilyMember({ name: values.name, email: values.email, sendInvite: values.sendInvite });
+      onAddFamilyMember({
+        name: values.name,
+        email: values.email || undefined,
+        status: values.email ? 'pending' : 'local',
+        sendInvite: values.email ? values.sendInvite : false
+      });
     }
     onOpenChange(false);
   }
@@ -127,8 +133,8 @@ export function AddFamilyMemberDialog({
           <DialogTitle className="font-headline">{isEditing ? 'Edit Family Member' : 'Add Family Member'}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? "Update the family member's details."
-              : 'Add a new member to your family group. They will be able to access shared passwords.'}
+              ? "Update the family member's details. Email is required for password sharing."
+              : 'Add a new member to your family group. Email can be left blank for local-only members.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -151,15 +157,18 @@ export function AddFamilyMemberDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Address</FormLabel>
+                  <FormLabel>Email Address (optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. jane.doe@example.com" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    Required to share passwords with this member.
+                  </FormDescription>
                    <FormMessage />
                 </FormItem>
               )}
             />
-             {!isEditing && (
+             {!isEditing && emailValue && (
               <FormField
                 control={form.control}
                 name="sendInvite"

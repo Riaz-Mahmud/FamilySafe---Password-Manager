@@ -5,7 +5,7 @@ import type { FamilyMember } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Edit, Trash2, Users, CheckCircle, Clock } from 'lucide-react';
+import { Edit, Trash2, Users, CheckCircle, Clock, UserX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 type FamilyMembersListProps = {
@@ -22,7 +22,7 @@ export function FamilyMembersList({ familyMembers, onEdit, onDelete, onMemberSel
         <Users className="h-16 w-16 text-muted-foreground mb-4" />
         <h2 className="text-2xl font-headline font-bold">No Family Members Found</h2>
         <p className="text-muted-foreground mt-2">
-          Click "Add Family Member" to invite someone to your family group.
+          Click "Add Family Member" to invite someone or add a local member for organization.
         </p>
       </div>
     );
@@ -42,16 +42,21 @@ export function FamilyMembersList({ familyMembers, onEdit, onDelete, onMemberSel
                 <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
               </Avatar>
               <h3 className="font-semibold text-lg">{member.name}</h3>
-              <p className="text-sm text-muted-foreground">{member.email}</p>
+              <p className="text-sm text-muted-foreground">{member.email || 'No email'}</p>
                {member.status === 'active' ? (
                   <Badge variant="secondary" className="mt-2 text-green-600 border-green-600/50">
                     <CheckCircle className="mr-1 h-3 w-3" />
                     Active
                   </Badge>
-                ) : (
+                ) : member.status === 'pending' ? (
                   <Badge variant="outline" className="mt-2">
                     <Clock className="mr-1 h-3 w-3" />
                     Pending
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="mt-2">
+                    <UserX className="mr-1 h-3 w-3" />
+                    Local
                   </Badge>
                 )}
             </div>

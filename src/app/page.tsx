@@ -276,20 +276,30 @@ export default function DashboardPage() {
     }
   };
   
-  const handleAddFamilyMember = async (memberData: Omit<FamilyMember, 'id' | 'avatar'> & { sendInvite?: boolean }) => {
+  const handleAddFamilyMember = async (memberData: Omit<FamilyMember, 'id' | 'avatar' | 'uid'> & { sendInvite?: boolean }) => {
     if (!user) return;
     try {
         const memberToAdd = {
             name: memberData.name,
             email: memberData.email,
             avatar: `https://placehold.co/40x40.png`,
-            status: 'pending' as const, // Always 'pending' until the account is linked.
+            status: memberData.status,
         };
-        
+
         await addFamilyMember(user.uid, memberToAdd);
+        
+        if (memberData.status === 'local') {
+            await addAuditLog(user.uid, 'Create Local Member', `Added ${memberData.name} as a local-only member.`);
+            toast({
+                title: 'Local Member Added',
+                description: `${memberData.name} has been added for organizational purposes.`,
+            });
+            return;
+        }
+
         await addAuditLog(user.uid, 'Create Family Member', `Added ${memberData.name} to the family group.`);
 
-        if (memberData.sendInvite && typeof window !== 'undefined') {
+        if (memberData.email && memberData.sendInvite && typeof window !== 'undefined') {
             const result = await sendInvitationEmailAction({
                 email: memberData.email,
                 referrerName: user.displayName || 'A friend',
@@ -324,7 +334,15 @@ export default function DashboardPage() {
   const handleUpdateFamilyMember = async (updatedMember: FamilyMember) => {
     if(!user) return;
     try {
-        await updateFamilyMember(user.uid, updatedMember.id, updatedMember);
+        const memberToUpdate: Partial<FamilyMember> = { ...updatedMember };
+        
+        // If email is removed, it becomes a local member and uid should be cleared.
+        if (!memberToUpdate.email) {
+            memberToUpdate.status = 'local';
+            delete memberToUpdate.uid;
+        }
+
+        await updateFamilyMember(user.uid, updatedMember.id, memberToUpdate);
         await addAuditLog(user.uid, 'Update Family Member', `Updated details for ${updatedMember.name}.`);
         toast({
             title: 'Family Member Updated',
@@ -418,6 +436,14 @@ export default function DashboardPage() {
   };
 
   const handleSelectFamilyMember = (memberId: string) => {
+    const member = familyMembers.find(m => m.id === memberId);
+    if (!member || member.status === 'local') {
+      toast({
+        title: 'Cannot View Shared List',
+        description: 'You can only view passwords shared with active, non-local members.',
+      });
+      return;
+    }
     setSelectedFamilyMemberId(memberId);
     setActiveMenu('All Passwords');
     setSearchTerm('');
