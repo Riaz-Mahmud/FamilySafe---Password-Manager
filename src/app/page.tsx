@@ -283,7 +283,7 @@ export default function DashboardPage() {
             name: memberData.name,
             email: memberData.email,
             avatar: `https://placehold.co/40x40.png`,
-            status: 'pending' as const,
+            status: memberData.sendInvite ? 'pending' : 'active' as const,
         };
         await addFamilyMember(user.uid, memberToAdd);
         await addAuditLog(user.uid, 'Create Family Member', `Added ${memberData.name} to the family group.`);
@@ -311,7 +311,7 @@ export default function DashboardPage() {
         } else {
             toast({
                 title: 'Family Member Added',
-                description: `${memberData.name} has been added to your family group.`,
+                description: `${memberData.name} has been added to your family group as an active member.`,
             });
         }
     } catch (error) {

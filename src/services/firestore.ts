@@ -262,18 +262,22 @@ export function getReferralCount(userId: string, callback: (count: number) => vo
 
 export async function activateFamilyMember(referrerId: string, referredUid: string, referredEmail: string): Promise<void> {
     const familyMembersCol = collection(db, 'users', referrerId, 'familyMembers');
-    const q = query(familyMembersCol, where("email", "==", referredEmail), where("status", "==", "pending"));
+    const q = query(familyMembersCol, where("email", "==", referredEmail));
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
         const familyMemberDoc = querySnapshot.docs[0];
-        await updateDoc(familyMemberDoc.ref, {
-            status: 'active',
-            uid: referredUid,
-        });
-        console.log(`Activated family member ${referredEmail} for referrer ${referrerId}`);
+        if (!familyMemberDoc.data().uid) {
+            await updateDoc(familyMemberDoc.ref, {
+                status: 'active',
+                uid: referredUid,
+            });
+            console.log(`Linked and activated family member ${referredEmail} for referrer ${referrerId}`);
+        } else {
+             console.log(`Family member ${referredEmail} for referrer ${referrerId} is already linked to an account.`);
+        }
     } else {
-        console.log(`No pending family member found for email ${referredEmail} for referrer ${referrerId}`);
+        console.log(`No family member record found for email ${referredEmail} under referrer ${referrerId}. This signup is not part of a family invitation.`);
     }
 }
 
