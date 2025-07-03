@@ -124,6 +124,7 @@ export default function DashboardPage() {
   const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [searchTerm, setSearchTerm] = useState('');
   const [isTravelModeActive, setTravelModeActive] = useState(false);
+  const [selectedFamilyMember, setSelectedFamilyMember] = useState<FamilyMember | null>(null);
 
   // Dialog state
   const [isAddPasswordDialogOpen, setAddPasswordDialogOpen] = useState(false);
@@ -635,12 +636,23 @@ export default function DashboardPage() {
   const handleMenuClick = (menu: string) => {
     setActiveMenu(menu);
     setSearchTerm('');
+    setSelectedFamilyMember(null);
   };
 
   const handleVaultSelect = (vaultId: string) => {
     setSelectedVaultId(vaultId);
     setActiveMenu('All Items');
     setSearchTerm('');
+    setSelectedFamilyMember(null);
+  };
+  
+  const handleFamilyMemberSelect = (memberId: string) => {
+    const member = familyMembers.find((m) => m.id === memberId);
+    if (member) {
+        setSelectedFamilyMember(member);
+        setActiveMenu('SharedWithFamilyMember');
+        setSearchTerm('');
+    }
   };
 
   // --- Derived State for Filtering ---
@@ -749,7 +761,66 @@ export default function DashboardPage() {
           />
         );
       case 'Family Members':
-        return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} onMemberSelect={() => {}} />;
+        return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} onMemberSelect={handleFamilyMemberSelect} />;
+      case 'SharedWithFamilyMember': {
+        if (!selectedFamilyMember) return null;
+        
+        const credentialsSharedByMe = allOwnedCredentials.filter(c => c.sharedWith?.includes(selectedFamilyMember.id));
+        const credentialsSharedToMe = allSharedCredentials.filter(c => c.ownerId === selectedFamilyMember.uid);
+        const combinedCredentials = [...credentialsSharedByMe, ...credentialsSharedToMe];
+
+        const documentsSharedByMe = allOwnedDocuments.filter(d => d.sharedWith?.includes(selectedFamilyMember.id));
+        const documentsSharedToMe = allSharedDocuments.filter(d => d.ownerId === selectedFamilyMember.uid);
+        const combinedDocuments = [...documentsSharedByMe, ...documentsSharedToMe];
+        
+        const filteredCombinedCredentials = combinedCredentials.filter(credential => {
+            if (searchTerm) {
+                const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                return credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
+                       credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
+                       (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+            }
+            return true;
+        });
+
+        const filteredCombinedDocuments = combinedDocuments.filter(doc => {
+            if (searchTerm) {
+                const lowerCaseSearchTerm = searchTerm.toLowerCase();
+                return doc.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+                       doc.fileType.toLowerCase().includes(lowerCaseSearchTerm);
+            }
+            return true;
+        });
+
+        if (filteredCombinedCredentials.length === 0 && filteredCombinedDocuments.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
+                    <Users className="h-16 w-16 text-muted-foreground mb-4" />
+                    <h2 className="text-2xl font-headline font-bold">Nothing Shared Yet</h2>
+                    <p className="text-muted-foreground mt-2">
+                        You haven't shared anything with {selectedFamilyMember.name}, and they haven't shared anything with you.
+                    </p>
+                </div>
+            );
+        }
+
+        return (
+          <div className="space-y-8">
+            {filteredCombinedCredentials.length > 0 && <PasswordList
+              credentials={filteredCombinedCredentials}
+              onEdit={openEditPasswordDialog}
+              onDelete={setDeleteTargetId}
+              onSend={openSendEmailDialog}
+            />}
+            {filteredCombinedDocuments.length > 0 && <SecureDocumentList
+              documents={filteredCombinedDocuments}
+              onEdit={openEditDocumentDialog}
+              onDelete={setDeleteDocumentTargetId}
+              onPreview={openPreviewDialog}
+            />}
+          </div>
+        );
+      }
       case 'Password Health Report':
         return <PasswordHealthReportPage credentials={allOwnedCredentials} onEditCredential={openEditPasswordDialog} />;
       case 'Audit Logs':
@@ -765,7 +836,9 @@ export default function DashboardPage() {
     }
   };
 
-  const pageTitle = activeMenu === 'All Items' 
+  const pageTitle = activeMenu === 'SharedWithFamilyMember' && selectedFamilyMember
+    ? `Shared with ${selectedFamilyMember.name}`
+    : activeMenu === 'All Items' 
     ? selectedVault?.name || 'Vault' 
     : activeMenu === 'Shared Passwords'
     ? 'Passwords Shared with Me'
@@ -807,7 +880,7 @@ export default function DashboardPage() {
               </SidebarMenuAction>
               {vaults.map((vault) => (
                 <SidebarMenuItem key={vault.id}>
-                  <SidebarMenuButton onClick={() => handleVaultSelect(vault.id)} isActive={selectedVaultId === vault.id && !activeMenu.includes('Shared')} tooltip={vault.name}>
+                  <SidebarMenuButton onClick={() => handleVaultSelect(vault.id)} isActive={selectedVaultId === vault.id && !activeMenu.includes('Shared') && activeMenu !== 'SharedWithFamilyMember'} tooltip={vault.name}>
                     <Home /> {vault.name}
                   </SidebarMenuButton>
                   <SidebarMenuAction onClick={(e) => {e.stopPropagation(); setVaultToDelete(vault)}} tooltip="Delete Vault" className="text-muted-foreground hover:text-destructive">
@@ -834,7 +907,7 @@ export default function DashboardPage() {
              <SidebarGroup>
               <SidebarGroupLabel>Security & Management</SidebarGroupLabel>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => handleMenuClick('Family Members')} isActive={activeMenu === 'Family Members'} tooltip="Family Members">
+                <SidebarMenuButton onClick={() => handleMenuClick('Family Members')} isActive={activeMenu === 'Family Members' || activeMenu === 'SharedWithFamilyMember'} tooltip="Family Members">
                   <Users /> Family Members
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -906,26 +979,34 @@ export default function DashboardPage() {
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
             
-            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') || activeMenu.includes('Shared') ? (
+            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') || activeMenu.includes('Shared') || activeMenu === 'SharedWithFamilyMember' ? (
               <>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder={activeMenu.includes('Shared') ? "Search shared items..." : "Search this vault..."}
+                    placeholder={
+                        activeMenu === 'SharedWithFamilyMember' && selectedFamilyMember 
+                        ? `Search items shared with ${selectedFamilyMember.name}...`
+                        : activeMenu.includes('Shared') ? "Search shared items..." : "Search this vault..."
+                    }
                     className="pl-10 w-full max-w-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    disabled={!selectedVaultId && !activeMenu.includes('Shared')}
+                    disabled={!selectedVaultId && !activeMenu.includes('Shared') && activeMenu !== 'SharedWithFamilyMember'}
                   />
                 </div>
-                 <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents' || activeMenu.includes('Shared')}>
-                  <Plus className="h-5 w-5 md:mr-2" />
-                  <span className="hidden md:inline">Add Credential</span>
-                </Button>
-                <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords' || activeMenu.includes('Shared')}>
-                  <Plus className="h-5 w-5 md:mr-2" />
-                  <span className="hidden md:inline">Add Document</span>
-                </Button>
+                 {activeMenu !== 'SharedWithFamilyMember' && (
+                    <>
+                        <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents' || activeMenu.includes('Shared')}>
+                          <Plus className="h-5 w-5 md:mr-2" />
+                          <span className="hidden md:inline">Add Credential</span>
+                        </Button>
+                        <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords' || activeMenu.includes('Shared')}>
+                          <Plus className="h-5 w-5 md:mr-2" />
+                          <span className="hidden md:inline">Add Document</span>
+                        </Button>
+                    </>
+                 )}
               </>
             ) : activeMenu === 'Family Members' ? (
               <>
@@ -940,7 +1021,7 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{pageTitle}</h1>
-            {(selectedVaultId || activeMenu.includes('Shared')) ? renderContent() : (
+            {(selectedVaultId || activeMenu.includes('Shared') || activeMenu === 'SharedWithFamilyMember') ? renderContent() : (
               !isDataLoading && (
                 <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
                   <BadgeInfo className="h-16 w-16 text-muted-foreground mb-4" />
@@ -1075,3 +1156,4 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
+
