@@ -45,6 +45,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           icon: data.icon,
           tags: data.tags || [],
           expiryMonths: data.expiryMonths,
+          safeForTravel: data.safeForTravel || false,
         } as Credential;
     });
     callback(credentials);
@@ -66,6 +67,7 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     notes: encryptData(credential.notes || '', userId),
     tags: credential.tags || [],
     expiryMonths: credential.expiryMonths || null,
+    safeForTravel: credential.safeForTravel || false,
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
@@ -89,6 +91,10 @@ export async function updateCredential(userId: string, id: string, credential: P
   if (credential.hasOwnProperty('expiryMonths')) {
     encryptedUpdate.expiryMonths = credential.expiryMonths || null;
   }
+  if (credential.hasOwnProperty('safeForTravel')) {
+    encryptedUpdate.safeForTravel = credential.safeForTravel || false;
+  }
+
 
   await updateDoc(docRef, {
       ...encryptedUpdate,

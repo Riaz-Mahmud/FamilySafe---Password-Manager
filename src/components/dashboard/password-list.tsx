@@ -26,7 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle, Plane } from 'lucide-react';
 import type { Credential, FamilyMember } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { addMonths, differenceInDays, format, isPast } from 'date-fns';
@@ -38,6 +38,7 @@ type PasswordListProps = {
   onDelete: (id: string) => void;
   onSend: (credential: Credential) => void;
   onMemberSelect: (id: string) => void;
+  isTravelModeActive?: boolean;
 };
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -72,7 +73,7 @@ const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) =>
   return { status: 'ok', message: `Expires on ${format(expiryDate, 'MMM d, yyyy')}` };
 };
 
-export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect }: PasswordListProps) {
+export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect, isTravelModeActive }: PasswordListProps) {
   const { toast } = useToast();
 
   const handleCopy = (text: string, field: string) => {
@@ -124,13 +125,17 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   }
 
   if (credentials.length === 0) {
+    const IconComponent = isTravelModeActive ? Plane : KeyRound;
+    const title = isTravelModeActive ? "No Passwords for Travel" : "No Passwords Found";
+    const description = isTravelModeActive 
+        ? "Mark credentials as 'Safe for Travel' to see them here."
+        : 'Click "Add Credential" to save your first password.';
+    
     return (
         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
-            <KeyRound className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-headline font-bold">No Passwords Found</h2>
-            <p className="text-muted-foreground mt-2">
-                Click "Add Credential" to save your first password.
-            </p>
+            <IconComponent className="h-16 w-16 text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-headline font-bold">{title}</h2>
+            <p className="text-muted-foreground mt-2">{description}</p>
         </div>
     );
   }

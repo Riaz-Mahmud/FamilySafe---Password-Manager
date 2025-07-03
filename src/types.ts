@@ -11,6 +11,7 @@ export interface Credential {
   icon: string;
   tags: string[];
   expiryMonths?: number;
+  safeForTravel?: boolean;
 }
 
 export interface FamilyMember {

@@ -50,6 +50,7 @@ import { Check, ChevronsUpDown, X, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -59,6 +60,7 @@ const formSchema = z.object({
   sharedWith: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   expiryMonths: z.number().optional(),
+  safeForTravel: z.boolean().optional(),
 });
 
 type AddPasswordDialogProps = {
@@ -93,6 +95,7 @@ export function AddPasswordDialog({
       sharedWith: [],
       tags: [],
       expiryMonths: 0,
+      safeForTravel: false,
     },
   });
 
@@ -109,6 +112,7 @@ export function AddPasswordDialog({
           sharedWith: credentialToEdit.sharedWith,
           tags: credentialToEdit.tags || [],
           expiryMonths: credentialToEdit.expiryMonths || 0,
+          safeForTravel: credentialToEdit.safeForTravel || false,
         });
       } else {
         form.reset({
@@ -119,6 +123,7 @@ export function AddPasswordDialog({
           sharedWith: [],
           tags: [],
           expiryMonths: 0,
+          safeForTravel: false,
         });
       }
     }
@@ -131,6 +136,7 @@ export function AddPasswordDialog({
         sharedWith: values.sharedWith || [],
         tags: values.tags || [],
         expiryMonths: values.expiryMonths || 0,
+        safeForTravel: values.safeForTravel || false,
     };
 
     if (credentialToEdit) {
@@ -389,6 +395,26 @@ export function AddPasswordDialog({
                     })}
                   </div>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="safeForTravel"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Safe for Travel</FormLabel>
+                    <FormDescription>
+                      This item will be visible when Travel Mode is on.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

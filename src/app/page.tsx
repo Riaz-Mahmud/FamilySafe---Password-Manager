@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   History,
   MonitorSmartphone,
+  Plane,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,8 @@ import { SendEmailDialog } from '@/components/dashboard/send-email-dialog';
 import { PasswordHealthReportPage } from '@/components/dashboard/security-health-page';
 import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 
 export default function DashboardPage() {
@@ -95,6 +98,7 @@ export default function DashboardPage() {
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
+  const [isTravelModeActive, setTravelModeActive] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,6 +106,17 @@ export default function DashboardPage() {
       router.replace('/login');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    const savedTravelMode = localStorage.getItem('travelMode');
+    if (savedTravelMode) {
+      setTravelModeActive(JSON.parse(savedTravelMode));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('travelMode', JSON.stringify(isTravelModeActive));
+  }, [isTravelModeActive]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -343,7 +358,12 @@ export default function DashboardPage() {
   };
 
   const filteredCredentials = credentials.filter(credential => {
-      // Filter by active menu first, as it's the primary mode
+      // Filter by Travel Mode first
+      if (isTravelModeActive && !credential.safeForTravel) {
+        return false;
+      }
+      
+      // Filter by active menu second, as it's the primary mode
       if (activeMenu === 'My Passwords') {
         if (credential.sharedWith.length !== 0) return false;
       }
@@ -399,6 +419,7 @@ export default function DashboardPage() {
             onDelete={setDeleteTargetId}
             onSend={openSendEmailDialog}
             onMemberSelect={handleSelectFamilyMember}
+            isTravelModeActive={isTravelModeActive}
           />
         );
       case 'Family Members':
@@ -522,6 +543,19 @@ export default function DashboardPage() {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
+          <div className="p-2">
+            <div className="flex items-center justify-between rounded-lg p-2 hover:bg-sidebar-accent">
+                <div className="flex items-center gap-2">
+                    <Plane className="h-4 w-4" />
+                    <Label htmlFor="travel-mode" className="text-sm font-medium cursor-pointer">Travel Mode</Label>
+                </div>
+                <Switch
+                    id="travel-mode"
+                    checked={isTravelModeActive}
+                    onCheckedChange={setTravelModeActive}
+                />
+            </div>
+          </div>
           <Separator className="my-2" />
           {user && (
             <div className="flex items-center gap-3 p-2">
