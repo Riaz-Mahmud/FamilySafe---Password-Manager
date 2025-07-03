@@ -86,3 +86,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 -   `npm run build`: Creates a production-ready build of the application.
 -   `npm run start`: Starts the production server.
 -   `npm run lint`: Lints the codebase for potential errors.
+
+## Contributing
+
+We’re looking for contributions in areas like:
+
+-   **Localization and Internationalization**: Help translate FamilySafe into other languages.
+-   **Browser Extension**: Building a browser extension for autofilling credentials.
+-   **Integrations**: Developing a plugin or extension system for third-party integrations.
+-   **Tooling**: Creating a secure CLI tool or API wrapper.
+-   **Testing**: Improving our test coverage with unit and end-to-end testing.
+-   **CI/CD**: Enhancing our CI/CD workflows.
+-   **Analytics**: Designing a privacy-first analytics dashboard for credential health and usage insights.
+
+Whether you're a frontend developer, backend engineer, security enthusiast, or first-time open-source contributor, there’s a place for you in the FamilySafe project!
