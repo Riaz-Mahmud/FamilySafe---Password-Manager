@@ -15,6 +15,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,16 +24,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FamilyMember } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const formSchema = z.object({
   name: z.string().min(1, { message: 'Name is required.' }),
   email: z.string().email({ message: 'Please enter a valid email.' }),
+  sendInvite: z.boolean().default(true).optional(),
 });
 
 type AddFamilyMemberDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddFamilyMember: (member: Omit<FamilyMember, 'id' | 'avatar'>) => void;
+  onAddFamilyMember: (member: Omit<FamilyMember, 'id' | 'avatar'> & { sendInvite?: boolean }) => void;
   onUpdateFamilyMember: (member: FamilyMember) => void;
   familyMemberToEdit: FamilyMember | null;
 };
@@ -51,6 +54,7 @@ export function AddFamilyMemberDialog({
     defaultValues: {
       name: '',
       email: '',
+      sendInvite: true,
     },
   });
 
@@ -60,11 +64,13 @@ export function AddFamilyMemberDialog({
         form.reset({
           name: familyMemberToEdit.name,
           email: familyMemberToEdit.email,
+          sendInvite: false, // Don't default to true when editing
         });
       } else {
         form.reset({
           name: '',
           email: '',
+          sendInvite: true,
         });
       }
     }
@@ -78,7 +84,7 @@ export function AddFamilyMemberDialog({
         email: values.email,
       });
     } else {
-      onAddFamilyMember({ name: values.name, email: values.email });
+      onAddFamilyMember({ name: values.name, email: values.email, sendInvite: values.sendInvite });
     }
     onOpenChange(false);
   }
@@ -122,6 +128,30 @@ export function AddFamilyMemberDialog({
                 </FormItem>
               )}
             />
+             {!isEditing && (
+              <FormField
+                control={form.control}
+                name="sendInvite"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Send invitation email
+                      </FormLabel>
+                      <FormDescription>
+                        An email will be sent to this address with a link to sign up.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                 Cancel

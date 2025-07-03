@@ -76,6 +76,7 @@ import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { sendInvitationEmailAction } from '@/app/actions';
 
 
 export default function DashboardPage() {
@@ -230,19 +231,43 @@ export default function DashboardPage() {
     }
   };
   
-  const handleAddFamilyMember = async (newMember: Omit<FamilyMember, 'id' | 'avatar'>) => {
-     if(!user) return;
-     try {
+  const handleAddFamilyMember = async (memberData: Omit<FamilyMember, 'id' | 'avatar'> & { sendInvite?: boolean }) => {
+    if (!user) return;
+    try {
         const memberToAdd = {
-            ...newMember,
+            name: memberData.name,
+            email: memberData.email,
             avatar: `https://placehold.co/40x40.png`,
         };
         await addFamilyMember(user.uid, memberToAdd);
-        await addAuditLog(user.uid, 'Create Family Member', `Added ${newMember.name} to the family group.`);
-        toast({
-            title: 'Family Member Added',
-            description: `${newMember.name} has been added to your family group.`,
-        });
+        await addAuditLog(user.uid, 'Create Family Member', `Added ${memberData.name} to the family group.`);
+
+        if (memberData.sendInvite && typeof window !== 'undefined') {
+            const result = await sendInvitationEmailAction({
+                email: memberData.email,
+                referrerName: user.displayName || 'A friend',
+                referralLink: `${window.location.origin}/signup?ref=${user.uid}`,
+            });
+
+            if (result.success) {
+                toast({
+                    title: 'Family Member Added & Invited',
+                    description: `${memberData.name} has been added and an invitation email has been sent.`,
+                });
+            } else {
+                toast({
+                    title: 'Member Added (Invite Failed)',
+                    description: `${memberData.name} was added, but the invite email failed: ${result.message}`,
+                    variant: 'destructive',
+                    duration: 8000,
+                });
+            }
+        } else {
+            toast({
+                title: 'Family Member Added',
+                description: `${memberData.name} has been added to your family group.`,
+            });
+        }
     } catch (error) {
         console.error("Error adding family member:", error);
         toast({ title: 'Error', description: 'Failed to add family member.', variant: 'destructive' });
