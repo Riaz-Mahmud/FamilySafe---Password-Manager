@@ -325,9 +325,8 @@ export function AddPasswordDialog({
                       </FormDescription>
                       <ScrollArea className="h-40 rounded-md border">
                         <div className="p-4">
-                        {familyMembers.filter(m => m.email).length > 0 ? (
+                        {familyMembers.length > 0 ? (
                           familyMembers
-                            .filter(member => member.email)
                             .map((member) => (
                               <FormField
                                 key={member.id}
@@ -357,7 +356,7 @@ export function AddPasswordDialog({
                                         <div className="flex flex-col">
                                           <span>{member.name}</span>
                                           <span className="text-xs text-muted-foreground">
-                                            {member.email}
+                                            {member.email || 'Local Member'}
                                           </span>
                                         </div>
                                       </FormLabel>
@@ -368,7 +367,7 @@ export function AddPasswordDialog({
                             ))
                         ) : (
                           <div className="text-center text-sm text-muted-foreground py-4">
-                            No family members with an email address found. Add one on the Family Members page to enable sharing.
+                            No family members found. Add one on the Family Members page to enable sharing.
                           </div>
                         )}
                         </div>
