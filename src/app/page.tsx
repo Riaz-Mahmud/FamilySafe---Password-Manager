@@ -398,6 +398,7 @@ export default function DashboardPage() {
             onEdit={openEditDialog}
             onDelete={setDeleteTargetId}
             onSend={openSendEmailDialog}
+            onMemberSelect={handleSelectFamilyMember}
           />
         );
       case 'Family Members':

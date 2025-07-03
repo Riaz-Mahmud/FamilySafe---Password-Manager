@@ -36,6 +36,7 @@ type PasswordListProps = {
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
   onSend: (credential: Credential) => void;
+  onMemberSelect: (id: string) => void;
 };
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -44,7 +45,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   Bot,
 };
 
-export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend }: PasswordListProps) {
+export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect }: PasswordListProps) {
   const { toast } = useToast();
 
   const handleCopy = (text: string, field: string) => {
@@ -89,15 +90,21 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
       return (
         <div className="flex items-center">
           {sharedWithMembers.slice(0, 3).map((member) => (
-              <Tooltip key={member.id}>
+            <Tooltip key={member.id}>
               <TooltipTrigger asChild>
+                <button
+                  onClick={() => onMemberSelect(member.id)}
+                  className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  aria-label={`View passwords shared with ${member.name}`}
+                >
                   <Avatar className={`h-8 w-8 border-2 border-background -ml-2 first:ml-0`}>
-                  <AvatarImage src={member.avatar} alt={member.name} />
-                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={member.avatar} alt={member.name} />
+                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                   </Avatar>
+                </button>
               </TooltipTrigger>
-              <TooltipContent>{member.name}</TooltipContent>
-              </Tooltip>
+              <TooltipContent>View passwords shared with {member.name}</TooltipContent>
+            </Tooltip>
           ))}
           {sharedWithMembers.length > 3 && (
               <div className="h-8 w-8 rounded-full bg-secondary border-2 border-background -ml-2 flex items-center justify-center text-xs font-semibold">
