@@ -13,6 +13,7 @@ import {
   orderBy,
   onSnapshot,
   getDocs,
+  getDoc,
   where,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '@/lib/crypto';
@@ -133,7 +134,17 @@ export function getFamilyMembers(userId: string, callback: (familyMembers: Famil
 
 export async function addFamilyMember(userId: string, member: Omit<FamilyMember, 'id'>): Promise<void> {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
-  await addDoc(familyMembersCol, member);
+  const familyMemberDocRef = await addDoc(familyMembersCol, member);
+
+  // If they are pending, add to the global invitations collection for lookup on signup
+  if (member.status === 'pending') {
+    const invitationsCol = collection(db, 'invitations');
+    await addDoc(invitationsCol, {
+      referrerId: userId,
+      inviteeEmail: member.email,
+      familyMemberDocId: familyMemberDocRef.id,
+    });
+  }
 }
 
 export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {
@@ -143,7 +154,23 @@ export async function updateFamilyMember(userId: string, id: string, member: Par
 
 export async function deleteFamilyMember(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'familyMembers', id);
-  await deleteDoc(docRef);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    const memberData = docSnap.data();
+    await deleteDoc(docRef);
+
+    // If they were pending, also delete the corresponding invitation document
+    if (memberData.status === 'pending') {
+        const invitationsCol = collection(db, 'invitations');
+        // We can find the invitation using the familyMemberDocId
+        const q = query(invitationsCol, where("familyMemberDocId", "==", id));
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(async (invitationDoc) => {
+            await deleteDoc(invitationDoc.ref);
+        });
+    }
+  }
 }
 
 
@@ -238,7 +265,7 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
   await deleteDoc(sessionRef);
 }
 
-// --- Referrals ---
+// --- Referrals & Invitations ---
 
 export async function recordReferral(referrerId: string, referredUid: string): Promise<void> {
   if (referrerId === referredUid) return; // Can't refer yourself
@@ -260,24 +287,40 @@ export function getReferralCount(userId: string, callback: (count: number) => vo
   return unsubscribe;
 }
 
-export async function activateFamilyMember(referrerId: string, referredUid: string, referredEmail: string): Promise<void> {
-    const familyMembersCol = collection(db, 'users', referrerId, 'familyMembers');
-    const q = query(familyMembersCol, where("email", "==", referredEmail));
+export async function findAndActivateByEmail(newUserUid: string, newUserEmail: string): Promise<void> {
+    if (!newUserEmail) return;
+
+    const invitationsCol = collection(db, 'invitations');
+    // Find an invitation that matches the new user's email
+    const q = query(invitationsCol, where("inviteeEmail", "==", newUserEmail));
     const querySnapshot = await getDocs(q);
 
-    if (!querySnapshot.empty) {
-        const familyMemberDoc = querySnapshot.docs[0];
-        if (!familyMemberDoc.data().uid) {
-            await updateDoc(familyMemberDoc.ref, {
-                status: 'active',
-                uid: referredUid,
-            });
-            console.log(`Linked and activated family member ${referredEmail} for referrer ${referrerId}`);
-        } else {
-             console.log(`Family member ${referredEmail} for referrer ${referrerId} is already linked to an account.`);
-        }
-    } else {
-        console.log(`No family member record found for email ${referredEmail} under referrer ${referrerId}. This signup is not part of a family invitation.`);
+    if (querySnapshot.empty) {
+        console.log(`No pending invitations found for ${newUserEmail}.`);
+        return;
+    }
+
+    // Process all matching invitations (should typically be one)
+    for (const invitationDoc of querySnapshot.docs) {
+        const invitationData = invitationDoc.data();
+        const { referrerId, familyMemberDocId } = invitationData;
+
+        // Get the reference to the original familyMember document in the referrer's subcollection
+        const familyMemberDocRef = doc(db, 'users', referrerId, 'familyMembers', familyMemberDocId);
+        
+        // Update the family member to be active and link the new user's UID
+        await updateDoc(familyMemberDocRef, {
+            status: 'active',
+            uid: newUserUid,
+        });
+
+        // Record the referral for the inviter
+        await recordReferral(referrerId, newUserUid);
+
+        // Clean up the invitation document so it can't be used again
+        await deleteDoc(invitationDoc.ref);
+        
+        console.log(`Successfully activated family member for ${newUserEmail}.`);
     }
 }
 

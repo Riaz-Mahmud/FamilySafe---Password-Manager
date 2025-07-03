@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { signUp } from '@/services/auth';
-import { addAuditLog, recordReferral, activateFamilyMember } from '@/services/firestore';
+import { addAuditLog, findAndActivateByEmail } from '@/services/firestore';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
 
@@ -29,6 +29,8 @@ export default function SignupPage() {
   useEffect(() => {
     const refCode = searchParams.get('ref');
     if (refCode) {
+      // The new system doesn't need this, but we keep it to handle old links gracefully
+      // The new findAndActivateByEmail function is the source of truth now.
       localStorage.setItem('referralCode', refCode);
     }
   }, [searchParams]);
@@ -54,10 +56,13 @@ export default function SignupPage() {
       const newUser = await signUp(email, password);
       await addAuditLog(newUser.uid, 'Account Created', 'User created a new account.');
       
-      const referrerId = localStorage.getItem('referralCode');
-      if (referrerId && newUser.email) {
-        await recordReferral(referrerId, newUser.uid);
-        await activateFamilyMember(referrerId, newUser.uid, newUser.email);
+      // After a new user signs up, check if they match any pending invitations
+      if (newUser.email) {
+        await findAndActivateByEmail(newUser.uid, newUser.email);
+      }
+      
+      // Clean up referral code if it exists from the URL, as the new system handles activation regardless
+      if (localStorage.getItem('referralCode')) {
         localStorage.removeItem('referralCode');
       }
 
