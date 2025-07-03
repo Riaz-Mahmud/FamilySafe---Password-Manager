@@ -104,19 +104,20 @@ export async function deleteVault(userId: string, vaultId: string): Promise<void
 
 // --- Credentials ---
 
-export function getCredentialsForVault(userId: string, vaultId: string, callback: (credentials: Credential[]) => void): () => void {
+export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const q = query(credentialsCol, where('vaultId', '==', vaultId));
+  const q = query(credentialsCol);
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const credentialsFromDb = snapshot.docs.map(doc => {
         const data = doc.data();
+        const key = data.ownerId ? userId : data.ownerId || userId;
         return {
           id: doc.id,
           url: data.url,
-          username: decryptData(data.username, userId),
-          password: decryptData(data.password, userId),
-          notes: decryptData(data.notes, userId),
+          username: decryptData(data.username, key),
+          password: decryptData(data.password, key),
+          notes: decryptData(data.notes, key),
           lastModified: data.lastModified?.toDate(),
           createdAt: data.createdAt?.toDate(),
           icon: data.icon,
@@ -384,18 +385,19 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
 
 // --- Secure Documents ---
 
-export function getSecureDocumentsForVault(userId: string, vaultId: string, callback: (documents: SecureDocument[]) => void): () => void {
+export function getSecureDocuments(userId: string, callback: (documents: SecureDocument[]) => void): () => void {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
-  const q = query(documentsCol, where('vaultId', '==', vaultId));
+  const q = query(documentsCol);
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const documents = snapshot.docs.map(doc => {
         const data = doc.data();
+        const key = data.ownerId ? userId : data.ownerId || userId;
         return {
           id: doc.id,
           name: data.name,
-          notes: decryptData(data.notes, userId),
-          fileDataUrl: decryptData(data.fileDataUrl, userId),
+          notes: decryptData(data.notes, key),
+          fileDataUrl: decryptData(data.fileDataUrl, key),
           fileType: data.fileType,
           fileSize: data.fileSize,
           icon: data.icon,

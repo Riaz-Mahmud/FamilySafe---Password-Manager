@@ -38,6 +38,7 @@ import {
   Trash,
   GanttChartSquare,
   BadgeInfo,
+  Inbox,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -61,7 +62,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { AddFamilyMemberDialog } from '@/components/dashboard/add-family-member-dialog';
 import {
-  getCredentialsForVault,
+  getCredentials,
   addCredential,
   updateCredential,
   deleteCredential,
@@ -73,7 +74,7 @@ import {
   getAuditLogs,
   getDeviceSessions,
   revokeDeviceSession,
-  getSecureDocumentsForVault,
+  getSecureDocuments,
   addSecureDocument,
   updateSecureDocument,
   deleteSecureDocument,
@@ -107,15 +108,15 @@ export default function DashboardPage() {
   
   // Data state
   const [vaults, setVaults] = useState<Vault[]>([]);
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [secureDocuments, setSecureDocuments] = useState<SecureDocument[]>([]);
+  const [allCredentials, setAllCredentials] = useState<Credential[]>([]);
+  const [allSecureDocuments, setAllSecureDocuments] = useState<SecureDocument[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
 
   // UI State
   const [isDataLoading, setIsDataLoading] = useState(true);
-  const [isItemsLoading, setItemsLoading] = useState(false);
+  const [isItemsLoading, setItemsLoading] = useState(true);
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
   const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,7 +162,7 @@ export default function DashboardPage() {
     localStorage.setItem('travelMode', JSON.stringify(isTravelModeActive));
   }, [isTravelModeActive]);
   
-  // Effect for loading primary user data (non-vault specific)
+  // Effect for loading primary user data (non-item specific)
   useEffect(() => {
     if (!user?.uid) {
       setFamilyMembers([]);
@@ -193,7 +194,7 @@ export default function DashboardPage() {
     const unsubscribe = getVaults(user.uid, async (fetchedVaults) => {
       if (fetchedVaults.length === 0 && !authLoading) {
         // This is a new user, create a personal vault for them
-        const newVaultId = await createVault(user.uid, 'Personal');
+        await createVault(user.uid, 'Personal');
         // The listener will pick up the new vault, no need to set state here.
       } else {
         setVaults(fetchedVaults);
@@ -207,22 +208,22 @@ export default function DashboardPage() {
     return unsubscribe;
   }, [user?.uid, authLoading]);
   
-  // Effect for loading items within the selected vault
+  // Effect for loading ALL credentials and documents for the user
   useEffect(() => {
-    if (!user?.uid || !selectedVaultId) {
-      setCredentials([]);
-      setSecureDocuments([]);
+    if (!user?.uid) {
+      setAllCredentials([]);
+      setAllSecureDocuments([]);
       return;
     }
     
     setItemsLoading(true);
-    const unsubscribeCreds = getCredentialsForVault(user.uid, selectedVaultId, (creds) => {
-      setCredentials(creds);
+    const unsubscribeCreds = getCredentials(user.uid, (creds) => {
+      setAllCredentials(creds);
       setItemsLoading(false);
     });
     
-    const unsubscribeDocs = getSecureDocumentsForVault(user.uid, selectedVaultId, (docs) => {
-      setSecureDocuments(docs);
+    const unsubscribeDocs = getSecureDocuments(user.uid, (docs) => {
+      setAllSecureDocuments(docs);
       setItemsLoading(false);
     });
 
@@ -230,7 +231,7 @@ export default function DashboardPage() {
       unsubscribeCreds();
       unsubscribeDocs();
     };
-  }, [user?.uid, selectedVaultId]);
+  }, [user?.uid]);
 
 
   const handleSignOut = async () => {
@@ -369,7 +370,7 @@ export default function DashboardPage() {
 
   const handleDeleteCredential = async () => {
     if (deleteTargetId && user) {
-      const credToDelete = credentials.find(c => c.id === deleteTargetId);
+      const credToDelete = allCredentials.find(c => c.id === deleteTargetId);
       try {
         await deleteCredential(user.uid, deleteTargetId);
          if (credToDelete) {
@@ -427,7 +428,7 @@ export default function DashboardPage() {
 
   const handleDeleteSecureDocument = async () => {
     if (deleteDocumentTargetId && user) {
-      const docToDelete = secureDocuments.find(d => d.id === deleteDocumentTargetId);
+      const docToDelete = allSecureDocuments.find(d => d.id === deleteDocumentTargetId);
       try {
         await deleteSecureDocument(user.uid, deleteDocumentTargetId);
         if (docToDelete) {
@@ -637,7 +638,19 @@ export default function DashboardPage() {
     setSearchTerm('');
   };
 
-  const filteredCredentials = credentials.filter(credential => {
+  // --- Derived State for Filtering ---
+  const sharedCredentials = allCredentials.filter(c => !!c.ownerId);
+  const sharedDocuments = allSecureDocuments.filter(d => !!d.ownerId);
+  const ownedCredentials = allCredentials.filter(c => !c.ownerId);
+  const ownedDocuments = allSecureDocuments.filter(d => !d.ownerId);
+  
+  const vaultCredentials = ownedCredentials.filter(c => c.vaultId === selectedVaultId);
+  const vaultDocuments = ownedDocuments.filter(d => d.vaultId === selectedVaultId);
+
+  const credentialsToDisplay = activeMenu === 'Shared Items' ? sharedCredentials : vaultCredentials;
+  const documentsToDisplay = activeMenu === 'Shared Items' ? sharedDocuments : vaultDocuments;
+
+  const filteredCredentials = credentialsToDisplay.filter(credential => {
       if (isTravelModeActive && !credential.safeForTravel) return false;
       if (searchTerm) {
           const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -648,7 +661,7 @@ export default function DashboardPage() {
       return true;
   });
 
-  const filteredDocuments = secureDocuments.filter(doc => {
+  const filteredDocuments = documentsToDisplay.filter(doc => {
       if (searchTerm) {
           const lowerCaseSearchTerm = searchTerm.toLowerCase();
           return doc.name.toLowerCase().includes(lowerCaseSearchTerm) ||
@@ -717,10 +730,27 @@ export default function DashboardPage() {
             onPreview={openPreviewDialog}
           />
         );
+       case 'Shared Items':
+        return (
+          <div className="space-y-8">
+            <PasswordList
+              credentials={filteredCredentials}
+              onEdit={openEditPasswordDialog}
+              onDelete={setDeleteTargetId}
+              onSend={openSendEmailDialog}
+            />
+            <SecureDocumentList
+              documents={filteredDocuments}
+              onEdit={openEditDocumentDialog}
+              onDelete={setDeleteDocumentTargetId}
+              onPreview={openPreviewDialog}
+            />
+          </div>
+        );
       case 'Family Members':
         return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} onMemberSelect={() => {}} />;
       case 'Password Health Report':
-        return <PasswordHealthReportPage credentials={credentials} onEditCredential={openEditPasswordDialog} />;
+        return <PasswordHealthReportPage credentials={ownedCredentials} onEditCredential={openEditPasswordDialog} />;
       case 'Audit Logs':
         return <AuditLogsPage logs={auditLogs} />;
       case 'Device Management':
@@ -736,6 +766,8 @@ export default function DashboardPage() {
 
   const pageTitle = activeMenu === 'All Items' 
     ? selectedVault?.name || 'Vault' 
+    : activeMenu === 'Shared Items'
+    ? 'Shared with me'
     : activeMenu;
 
   return (
@@ -772,7 +804,7 @@ export default function DashboardPage() {
               </SidebarMenuAction>
               {vaults.map((vault) => (
                 <SidebarMenuItem key={vault.id}>
-                  <SidebarMenuButton onClick={() => handleVaultSelect(vault.id)} isActive={selectedVaultId === vault.id} tooltip={vault.name}>
+                  <SidebarMenuButton onClick={() => handleVaultSelect(vault.id)} isActive={selectedVaultId === vault.id && activeMenu !== 'Shared Items'} tooltip={vault.name}>
                     <Home /> {vault.name}
                   </SidebarMenuButton>
                   <SidebarMenuAction onClick={(e) => {e.stopPropagation(); setVaultToDelete(vault)}} tooltip="Delete Vault" className="text-muted-foreground hover:text-destructive">
@@ -781,6 +813,15 @@ export default function DashboardPage() {
                 </SidebarMenuItem>
               ))}
             </SidebarGroup>
+             <SidebarSeparator />
+              <SidebarGroup>
+                <SidebarGroupLabel>Sharing</SidebarGroupLabel>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => handleMenuClick('Shared Items')} isActive={activeMenu === 'Shared Items'} tooltip="Shared with me">
+                    <Inbox /> Shared with me
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarGroup>
              <SidebarSeparator />
              <SidebarGroup>
               <SidebarGroupLabel>Security & Management</SidebarGroupLabel>
@@ -857,23 +898,23 @@ export default function DashboardPage() {
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
             
-            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') ? (
+            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') || activeMenu.includes('Shared') ? (
               <>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search this vault..."
+                    placeholder={activeMenu.includes('Shared') ? "Search shared items..." : "Search this vault..."}
                     className="pl-10 w-full max-w-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    disabled={!selectedVaultId}
+                    disabled={!selectedVaultId && !activeMenu.includes('Shared')}
                   />
                 </div>
-                <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents'}>
+                 <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents' || activeMenu === 'Shared Items'}>
                   <Plus className="h-5 w-5 md:mr-2" />
                   <span className="hidden md:inline">Add Credential</span>
                 </Button>
-                <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords'}>
+                <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords' || activeMenu === 'Shared Items'}>
                   <Plus className="h-5 w-5 md:mr-2" />
                   <span className="hidden md:inline">Add Document</span>
                 </Button>
@@ -891,14 +932,16 @@ export default function DashboardPage() {
 
           <main className="flex-1 overflow-y-auto">
             <h1 className="text-3xl font-bold font-headline mb-6">{pageTitle}</h1>
-            {selectedVaultId ? renderContent() : (
-              <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
-                <BadgeInfo className="h-16 w-16 text-muted-foreground mb-4" />
-                <h2 className="text-2xl font-headline font-bold">No Vault Selected</h2>
-                <p className="text-muted-foreground mt-2">
-                  Select a vault from the sidebar to view its items, or create a new one.
-                </p>
-              </div>
+            {(selectedVaultId || activeMenu === 'Shared Items') ? renderContent() : (
+              !isDataLoading && (
+                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
+                  <BadgeInfo className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h2 className="text-2xl font-headline font-bold">No Vault Selected</h2>
+                  <p className="text-muted-foreground mt-2">
+                    Select a vault from the sidebar to view its items, or create a new one.
+                  </p>
+                </div>
+              )
             )}
           </main>
         </div>
