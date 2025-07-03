@@ -108,6 +108,7 @@ export function getCredentialsForVault(userId: string, vaultId: string, callback
           expiryMonths: data.expiryMonths,
           safeForTravel: data.safeForTravel || false,
           vaultId: data.vaultId,
+          sharedWith: data.sharedWith || [],
         } as Credential;
     });
     credentialsFromDb.sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
@@ -132,6 +133,7 @@ export async function addCredential(userId: string, vaultId: string, credential:
     tags: credential.tags || [],
     expiryMonths: credential.expiryMonths || null,
     safeForTravel: credential.safeForTravel || false,
+    sharedWith: credential.sharedWith || [],
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
@@ -158,6 +160,9 @@ export async function updateCredential(userId: string, id: string, credential: P
   }
   if (credential.hasOwnProperty('safeForTravel')) {
     encryptedUpdate.safeForTravel = credential.safeForTravel || false;
+  }
+  if (credential.hasOwnProperty('sharedWith')) {
+    encryptedUpdate.sharedWith = credential.sharedWith || [];
   }
 
   await updateDoc(docRef, {
@@ -379,6 +384,7 @@ export function getSecureDocumentsForVault(userId: string, vaultId: string, call
           lastModified: data.lastModified?.toDate(),
           createdAt: data.createdAt?.toDate(),
           vaultId: data.vaultId,
+          sharedWith: data.sharedWith || [],
         } as SecureDocument;
     });
     documents.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
@@ -399,6 +405,7 @@ export async function addSecureDocument(userId: string, vaultId: string, documen
     vaultId,
     notes: encryptData(documentData.notes, userId),
     fileDataUrl: encryptData(documentData.fileDataUrl, userId),
+    sharedWith: documentData.sharedWith || [],
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
@@ -418,6 +425,9 @@ export async function updateSecureDocument(userId: string, id: string, documentD
   }
   if (documentData.fileDataUrl) {
     encryptedUpdate.fileDataUrl = encryptData(documentData.fileDataUrl, userId);
+  }
+  if (documentData.hasOwnProperty('sharedWith')) {
+    encryptedUpdate.sharedWith = documentData.sharedWith || [];
   }
 
   await updateDoc(docRef, {

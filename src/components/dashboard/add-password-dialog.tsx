@@ -32,12 +32,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { Credential } from '@/types';
+import type { Credential, FamilyMember } from '@/types';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { PassphraseGenerator } from './passphrase-generator';
+import { Checkbox } from '../ui/checkbox';
+import { ScrollArea } from '../ui/scroll-area';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -47,6 +49,7 @@ const formSchema = z.object({
   tags: z.array(z.string()).optional(),
   expiryMonths: z.number().optional(),
   safeForTravel: z.boolean().optional(),
+  sharedWith: z.array(z.string()).optional(),
 });
 
 type AddPasswordDialogProps = {
@@ -56,6 +59,7 @@ type AddPasswordDialogProps = {
   onUpdateCredential: (credential: Credential) => void;
   credentialToEdit: Credential | null;
   vaultId: string | null;
+  familyMembers: FamilyMember[];
 };
 
 export function AddPasswordDialog({
@@ -65,6 +69,7 @@ export function AddPasswordDialog({
   onUpdateCredential,
   credentialToEdit,
   vaultId,
+  familyMembers,
 }: AddPasswordDialogProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [tagInput, setTagInput] = useState('');
@@ -81,6 +86,7 @@ export function AddPasswordDialog({
       tags: [],
       expiryMonths: 0,
       safeForTravel: false,
+      sharedWith: [],
     },
   });
 
@@ -97,6 +103,7 @@ export function AddPasswordDialog({
           tags: credentialToEdit.tags || [],
           expiryMonths: credentialToEdit.expiryMonths || 0,
           safeForTravel: credentialToEdit.safeForTravel || false,
+          sharedWith: credentialToEdit.sharedWith || [],
         });
       } else {
         form.reset({
@@ -107,6 +114,7 @@ export function AddPasswordDialog({
           tags: [],
           expiryMonths: 0,
           safeForTravel: false,
+          sharedWith: [],
         });
       }
     }
@@ -119,6 +127,7 @@ export function AddPasswordDialog({
         tags: values.tags || [],
         expiryMonths: values.expiryMonths || 0,
         safeForTravel: values.safeForTravel || false,
+        sharedWith: values.sharedWith || [],
     };
 
     if (credentialToEdit) {
@@ -304,6 +313,69 @@ export function AddPasswordDialog({
                     <FormMessage />
                     </FormItem>
                 )}
+                />
+                <FormField
+                  control={form.control}
+                  name="sharedWith"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Share With</FormLabel>
+                       <FormDescription>
+                        Select family members to share this credential with.
+                      </FormDescription>
+                      <ScrollArea className="h-40 rounded-md border">
+                        <div className="p-4">
+                        {familyMembers.filter(m => m.email).length > 0 ? (
+                          familyMembers
+                            .filter(member => member.email)
+                            .map((member) => (
+                              <FormField
+                                key={member.id}
+                                control={form.control}
+                                name="sharedWith"
+                                render={({ field }) => {
+                                  return (
+                                    <FormItem
+                                      key={member.id}
+                                      className="flex flex-row items-start space-x-3 space-y-0 mb-4"
+                                    >
+                                      <FormControl>
+                                        <Checkbox
+                                          checked={field.value?.includes(member.id)}
+                                          onCheckedChange={(checked) => {
+                                            return checked
+                                              ? field.onChange([...(field.value || []), member.id])
+                                              : field.onChange(
+                                                  field.value?.filter(
+                                                    (value) => value !== member.id
+                                                  )
+                                                )
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormLabel className="font-normal w-full cursor-pointer">
+                                        <div className="flex flex-col">
+                                          <span>{member.name}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {member.email}
+                                          </span>
+                                        </div>
+                                      </FormLabel>
+                                    </FormItem>
+                                  )
+                                }}
+                              />
+                            ))
+                        ) : (
+                          <div className="text-center text-sm text-muted-foreground py-4">
+                            No family members with an email address found. Add one on the Family Members page to enable sharing.
+                          </div>
+                        )}
+                        </div>
+                      </ScrollArea>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
                 <FormField
                 control={form.control}

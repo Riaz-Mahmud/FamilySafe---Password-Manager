@@ -845,6 +845,7 @@ export default function DashboardPage() {
         onUpdateCredential={handleUpdateCredential}
         credentialToEdit={editingCredential}
         vaultId={selectedVaultId}
+        familyMembers={familyMembers}
       />
 
       <AddSecureDocumentDialog
@@ -854,6 +855,7 @@ export default function DashboardPage() {
         onUpdateDocument={handleUpdateSecureDocument}
         documentToEdit={editingDocument}
         vaultId={selectedVaultId}
+        familyMembers={familyMembers}
       />
 
       <AddFamilyMemberDialog

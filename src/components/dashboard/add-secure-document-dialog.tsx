@@ -25,10 +25,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import type { SecureDocument } from '@/types';
+import type { FamilyMember, SecureDocument } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, File as FileIcon, Image as ImageIcon } from 'lucide-react';
+import { Upload, File as FileIcon } from 'lucide-react';
 import Image from 'next/image';
+import { Checkbox } from '../ui/checkbox';
+import { ScrollArea } from '../ui/scroll-area';
 
 const MAX_FILE_SIZE = 750 * 1024; // 750KB limit (before Base64 encoding)
 
@@ -37,6 +39,7 @@ const formSchema = z.object({
   name: z.string().min(1, { message: 'Document name is required.' }),
   notes: z.string().optional(),
   file: z.any().optional(),
+  sharedWith: z.array(z.string()).optional(),
 });
 
 type AddSecureDocumentDialogProps = {
@@ -46,6 +49,7 @@ type AddSecureDocumentDialogProps = {
   onUpdateDocument: (document: SecureDocument) => void;
   documentToEdit: SecureDocument | null;
   vaultId: string | null;
+  familyMembers: FamilyMember[];
 };
 
 export function AddSecureDocumentDialog({
@@ -55,6 +59,7 @@ export function AddSecureDocumentDialog({
   onUpdateDocument,
   documentToEdit,
   vaultId,
+  familyMembers,
 }: AddSecureDocumentDialogProps) {
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
@@ -71,6 +76,7 @@ export function AddSecureDocumentDialog({
       name: '',
       notes: '',
       file: null,
+      sharedWith: [],
     },
   });
 
@@ -81,6 +87,7 @@ export function AddSecureDocumentDialog({
           name: documentToEdit.name,
           notes: documentToEdit.notes,
           file: null, // File cannot be re-edited, only replaced
+          sharedWith: documentToEdit.sharedWith || [],
         });
         setSelectedFile({
           name: documentToEdit.name,
@@ -93,6 +100,7 @@ export function AddSecureDocumentDialog({
           name: '',
           notes: '',
           file: null,
+          sharedWith: [],
         });
         setSelectedFile(null);
       }
@@ -141,6 +149,7 @@ export function AddSecureDocumentDialog({
         ...documentToEdit,
         name: values.name,
         notes: values.notes || '',
+        sharedWith: values.sharedWith || [],
       };
       // If a new file was selected, update file-related fields
       if (selectedFile && values.file) {
@@ -162,6 +171,7 @@ export function AddSecureDocumentDialog({
         fileType: selectedFile.type,
         fileSize: selectedFile.size,
         icon: getFileIconName(selectedFile.type),
+        sharedWith: values.sharedWith || [],
       });
     }
     onOpenChange(false);
@@ -248,6 +258,69 @@ export function AddSecureDocumentDialog({
                   </div>
                 </div>
               )}
+               <FormField
+                  control={form.control}
+                  name="sharedWith"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Share With</FormLabel>
+                       <FormDescription>
+                        Select family members to share this document with.
+                      </FormDescription>
+                      <ScrollArea className="h-40 rounded-md border">
+                        <div className="p-4">
+                        {familyMembers.filter(m => m.email).length > 0 ? (
+                          familyMembers
+                            .filter(member => member.email)
+                            .map((member) => (
+                              <FormField
+                                key={member.id}
+                                control={form.control}
+                                name="sharedWith"
+                                render={({ field }) => {
+                                  return (
+                                    <FormItem
+                                      key={member.id}
+                                      className="flex flex-row items-start space-x-3 space-y-0 mb-4"
+                                    >
+                                      <FormControl>
+                                        <Checkbox
+                                          checked={field.value?.includes(member.id)}
+                                          onCheckedChange={(checked) => {
+                                            return checked
+                                              ? field.onChange([...(field.value || []), member.id])
+                                              : field.onChange(
+                                                  field.value?.filter(
+                                                    (value) => value !== member.id
+                                                  )
+                                                )
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormLabel className="font-normal w-full cursor-pointer">
+                                        <div className="flex flex-col">
+                                          <span>{member.name}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {member.email}
+                                          </span>
+                                        </div>
+                                      </FormLabel>
+                                    </FormItem>
+                                  )
+                                }}
+                              />
+                            ))
+                        ) : (
+                          <div className="text-center text-sm text-muted-foreground py-4">
+                            No family members with an email address found. Add one on the Family Members page to enable sharing.
+                          </div>
+                        )}
+                        </div>
+                      </ScrollArea>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
             </form>
           </Form>
         </div>

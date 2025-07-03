@@ -19,6 +19,7 @@ export interface Credential {
   expiryMonths?: number;
   safeForTravel?: boolean;
   vaultId: string;
+  sharedWith: string[];
 }
 
 export interface FamilyMember {
@@ -56,4 +57,5 @@ export interface SecureDocument {
   createdAt?: Date;
   icon: string; // lucide icon name
   vaultId: string;
+  sharedWith: string[];
 }
