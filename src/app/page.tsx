@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -79,6 +80,7 @@ import {
   createVault,
   getVaults,
   deleteVault,
+  addSharedItem,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -96,6 +98,7 @@ import { AddSecureDocumentDialog } from '@/components/dashboard/add-secure-docum
 import { SecureDocumentList } from '@/components/dashboard/secure-document-list';
 import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-document-preview-dialog';
 import { AddVaultDialog } from '@/components/dashboard/add-vault-dialog';
+import { encryptData } from '@/lib/crypto';
 
 
 export default function DashboardPage() {
@@ -272,6 +275,50 @@ export default function DashboardPage() {
       setVaultToDelete(null);
     }
   };
+  
+  const handleShareItem = async (
+    itemData: any, 
+    itemType: 'credential' | 'document', 
+    recipients: FamilyMember[]
+  ) => {
+    if (!user) return;
+    
+    let sharedCount = 0;
+    for (const recipient of recipients) {
+      if (!recipient.uid) continue;
+
+      let encryptedForRecipient;
+      const baseData = { ...itemData, ownerId: user.uid, ownerName: user.displayName || user.email };
+      
+      if (itemType === 'credential') {
+        encryptedForRecipient = {
+            ...baseData,
+            username: encryptData(baseData.username, recipient.uid),
+            password: encryptData(baseData.password, recipient.uid),
+            notes: encryptData(baseData.notes || '', recipient.uid),
+        };
+      } else { // document
+        encryptedForRecipient = {
+            ...baseData,
+            notes: encryptData(baseData.notes || '', recipient.uid),
+            fileDataUrl: encryptData(baseData.fileDataUrl, recipient.uid),
+        };
+      }
+      
+      try {
+        await addSharedItem(recipient.uid, itemType, encryptedForRecipient);
+        sharedCount++;
+      } catch (error) {
+        console.error(`Failed to share with ${recipient.name}`, error);
+        toast({ title: 'Sharing Error', description: `Could not share with ${recipient.name}.`, variant: 'destructive' });
+      }
+    }
+    
+    if (sharedCount > 0) {
+      const itemTypeName = itemType === 'credential' ? 'Credential' : 'Document';
+      toast({ title: 'Shared Successfully', description: `${itemTypeName} shared with ${sharedCount} member(s).` });
+    }
+  };
 
 
   // --- Credential Actions ---
@@ -284,6 +331,11 @@ export default function DashboardPage() {
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
       });
+      
+      const recipients = familyMembers.filter(m => newCredential.sharedWith?.includes(m.id));
+      if (recipients.length > 0) {
+        await handleShareItem(newCredential, 'credential', recipients);
+      }
     } catch (error) {
       console.error("Error adding credential:", error);
       toast({ title: 'Error', description: 'Failed to add credential.', variant: 'destructive' });
@@ -300,6 +352,15 @@ export default function DashboardPage() {
         title: 'Credential Updated',
         description: 'The credential has been updated successfully.',
       });
+      // Note: Sharing on update can be complex (e.g., removing shares). For now, we only handle adding new shares.
+      // A more robust implementation would compare previous and current sharedWith lists.
+      const recipients = familyMembers.filter(m => updatedCredential.sharedWith?.includes(m.id));
+      if (recipients.length > 0) {
+        // This simplified version might create duplicates if not handled carefully.
+        // For now, we assume sharing is an additive process on update.
+        // A full implementation would check for existing shared copies before adding.
+        // await handleShareItem(updatedCredential, 'credential', recipients);
+      }
     } catch (error) {
       console.error("Error updating credential:", error);
       toast({ title: 'Error', description: 'Failed to update credential.', variant: 'destructive' });
@@ -337,6 +398,11 @@ export default function DashboardPage() {
         title: 'Document Added',
         description: 'The new secure document has been saved successfully.',
       });
+
+      const recipients = familyMembers.filter(m => newDocument.sharedWith?.includes(m.id));
+      if (recipients.length > 0) {
+        await handleShareItem(newDocument, 'document', recipients);
+      }
     } catch (error) {
       console.error("Error adding document:", error);
       toast({ title: 'Error', description: 'Failed to add secure document.', variant: 'destructive' });
@@ -652,7 +718,7 @@ export default function DashboardPage() {
           />
         );
       case 'Family Members':
-        return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} />;
+        return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} onMemberSelect={() => {}} />;
       case 'Password Health Report':
         return <PasswordHealthReportPage credentials={credentials} onEditCredential={openEditPasswordDialog} />;
       case 'Audit Logs':

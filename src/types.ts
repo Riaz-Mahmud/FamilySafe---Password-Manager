@@ -20,6 +20,8 @@ export interface Credential {
   safeForTravel?: boolean;
   vaultId: string;
   sharedWith: string[];
+  ownerId?: string;
+  ownerName?: string;
 }
 
 export interface FamilyMember {
@@ -58,4 +60,6 @@ export interface SecureDocument {
   icon: string; // lucide icon name
   vaultId: string;
   sharedWith: string[];
+  ownerId?: string;
+  ownerName?: string;
 }

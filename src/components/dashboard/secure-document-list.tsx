@@ -29,6 +29,7 @@ import type { SecureDocument } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
 import Image from 'next/image';
+import { Badge } from '../ui/badge';
 
 type SecureDocumentListProps = {
   documents: SecureDocument[];
@@ -81,6 +82,15 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
       </div>
     );
   }
+  
+  const renderOwnership = (doc: SecureDocument) => {
+    if (!doc.ownerName) return null;
+    return (
+        <div className="mt-1">
+            <Badge variant="secondary" className="font-normal text-xs">Shared by {doc.ownerName}</Badge>
+        </div>
+    );
+  }
 
   return (
     <TooltipProvider>
@@ -110,6 +120,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                                 <div className="flex flex-col overflow-hidden">
                                     <p className="font-medium truncate">{doc.name}</p>
                                     <p className="text-sm text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
+                                    {renderOwnership(doc)}
                                 </div>
                             </div>
                             <DropdownMenu>
@@ -123,7 +134,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                                       <Eye className="mr-2 h-4 w-4" />
                                       Preview
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onEdit(doc)}>
+                                    <DropdownMenuItem onClick={() => onEdit(doc)} disabled={!!doc.ownerId}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
@@ -131,6 +142,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                                     <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
                                     onClick={() => onDelete(doc.id)}
+                                    disabled={!!doc.ownerId}
                                     >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -189,6 +201,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                       <div className="flex flex-col overflow-hidden">
                         <span className="font-medium truncate">{doc.name}</span>
                         <span className="text-sm text-muted-foreground">{doc.fileType}</span>
+                        {renderOwnership(doc)}
                       </div>
                     </div>
                   </TableCell>
@@ -210,7 +223,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                             <Download className="mr-2 h-4 w-4" />
                             Download
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onEdit(doc)}>
+                          <DropdownMenuItem onClick={() => onEdit(doc)} disabled={!!doc.ownerId}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -218,6 +231,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => onDelete(doc.id)}
+                            disabled={!!doc.ownerId}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete

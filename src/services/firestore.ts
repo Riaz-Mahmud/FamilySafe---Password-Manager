@@ -58,6 +58,22 @@ export async function createVault(userId: string, name: string): Promise<string>
   return docRef.id;
 }
 
+export async function getOrCreatePersonalVault(userId: string): Promise<Vault> {
+  const vaultsCol = collection(db, 'users', userId, 'vaults');
+  const q = query(vaultsCol, where('name', '==', 'Personal'), limit(1));
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+    const vaultDoc = snapshot.docs[0];
+    return { id: vaultDoc.id, ...vaultDoc.data() } as Vault;
+  } else {
+    const newVaultId = await createVault(userId, 'Personal');
+    const newVaultRef = doc(db, 'users', userId, 'vaults', newVaultId);
+    const newVaultSnap = await getDoc(newVaultRef);
+    return { id: newVaultSnap.id, ...newVaultSnap.data() } as Vault;
+  }
+}
+
 export async function updateVault(userId: string, vaultId: string, name: string): Promise<void> {
   const vaultRef = doc(db, 'users', userId, 'vaults', vaultId);
   await updateDoc(vaultRef, { name });
@@ -109,6 +125,8 @@ export function getCredentialsForVault(userId: string, vaultId: string, callback
           safeForTravel: data.safeForTravel || false,
           vaultId: data.vaultId,
           sharedWith: data.sharedWith || [],
+          ownerId: data.ownerId,
+          ownerName: data.ownerName,
         } as Credential;
     });
     credentialsFromDb.sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
@@ -385,6 +403,8 @@ export function getSecureDocumentsForVault(userId: string, vaultId: string, call
           createdAt: data.createdAt?.toDate(),
           vaultId: data.vaultId,
           sharedWith: data.sharedWith || [],
+          ownerId: data.ownerId,
+          ownerName: data.ownerName,
         } as SecureDocument;
     });
     documents.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
@@ -439,6 +459,21 @@ export async function updateSecureDocument(userId: string, id: string, documentD
 export async function deleteSecureDocument(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'secureDocuments', id);
   await deleteDoc(docRef);
+}
+
+// --- Sharing ---
+
+export async function addSharedItem(recipientUid: string, itemType: 'credential' | 'document', itemData: any): Promise<void> {
+    const personalVault = await getOrCreatePersonalVault(recipientUid);
+    const collectionName = itemType === 'credential' ? 'credentials' : 'secureDocuments';
+    const itemsCol = collection(db, 'users', recipientUid, collectionName);
+    
+    await addDoc(itemsCol, {
+        ...itemData,
+        vaultId: personalVault.id,
+        createdAt: serverTimestamp(),
+        lastModified: serverTimestamp(),
+    });
 }
 
 // --- Referrals & Invitations ---

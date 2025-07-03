@@ -157,6 +157,16 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
         </div>
     )
   }
+  
+  const renderOwnership = (credential: Credential) => {
+    if (!credential.ownerName) return null;
+    return (
+        <div className="mt-1">
+            <Badge variant="secondary" className="font-normal text-xs">Shared by {credential.ownerName}</Badge>
+        </div>
+    );
+  }
+
 
   return (
     <TooltipProvider>
@@ -173,8 +183,9 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                                 <IconComponent className="w-5 h-5 text-muted-foreground" />
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
-                                {renderSiteCell(credential)}
-                                {renderTags(credential)}
+                                    {renderSiteCell(credential)}
+                                    {renderTags(credential)}
+                                    {renderOwnership(credential)}
                                 </div>
                             </div>
                             <DropdownMenu>
@@ -184,7 +195,7 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => onEdit(credential)}>
+                                    <DropdownMenuItem onClick={() => onEdit(credential)} disabled={!!credential.ownerId}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
@@ -196,6 +207,7 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                                     <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
                                     onClick={() => onDelete(credential.id)}
+                                    disabled={!!credential.ownerId}
                                     >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -263,6 +275,7 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                       <div className="flex flex-col overflow-hidden">
                         {renderSiteCell(credential)}
                         {renderTags(credential)}
+                        {renderOwnership(credential)}
                       </div>
                     </div>
                   </TableCell>
@@ -307,7 +320,7 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                           </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEdit(credential)}>
+                          <DropdownMenuItem onClick={() => onEdit(credential)} disabled={!!credential.ownerId}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
@@ -319,6 +332,7 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => onDelete(credential.id)}
+                            disabled={!!credential.ownerId}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
