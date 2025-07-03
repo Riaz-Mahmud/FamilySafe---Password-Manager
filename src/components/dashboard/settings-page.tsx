@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { updateUserProfile, sendPasswordReset, deleteCurrentUser } from '@/services/auth';
-import { getUserDataForExport, getReferralCount, deleteUserData, checkRecoveryKeyExists } from '@/services/firestore';
+import { getUserDataForExport, getReferralCount, deleteUserData, checkRecoveryKeyExists, saveRecoveryKeyHash } from '@/services/firestore';
 import { Loader2, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useRouter } from 'next/navigation';
@@ -30,6 +30,8 @@ export function SettingsPage() {
   const [hasRecoveryKey, setHasRecoveryKey] = useState(false);
   const [isCheckingKey, setIsCheckingKey] = useState(true);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [newlyGeneratedKey, setNewlyGeneratedKey] = useState('');
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -160,11 +162,32 @@ export function SettingsPage() {
     }
   };
 
+  const handleGenerateKeyAndOpenDialog = async () => {
+    if (!user) return;
+    setIsGeneratingKey(true);
+    try {
+      const newKey = crypto.randomUUID();
+      await saveRecoveryKeyHash(user.uid, newKey);
+      setNewlyGeneratedKey(newKey);
+      setRecoveryKitOpen(true);
+      setHasRecoveryKey(true);
+    } catch (error) {
+      console.error("Failed to generate recovery key:", error);
+      toast({
+        title: 'Error',
+        description: 'Could not generate a new recovery kit. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
   const handleRecoveryClick = () => {
     if (hasRecoveryKey) {
       setShowRegenerateConfirm(true);
     } else {
-      setRecoveryKitOpen(true);
+      handleGenerateKeyAndOpenDialog();
     }
   };
 
@@ -244,8 +267,8 @@ export function SettingsPage() {
                 : "Generate a printable recovery kit in case you lose access to your account."
               }
             </p>
-             <Button variant="outline" onClick={handleRecoveryClick} disabled={isCheckingKey}>
-              {isCheckingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+             <Button variant="outline" onClick={handleRecoveryClick} disabled={isCheckingKey || isGeneratingKey}>
+              {(isCheckingKey || isGeneratingKey) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {hasRecoveryKey ? 'Generate New Recovery Kit' : 'Generate Recovery Kit'}
             </Button>
           </div>
@@ -313,7 +336,7 @@ export function SettingsPage() {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={() => {
                     setShowRegenerateConfirm(false);
-                    setRecoveryKitOpen(true);
+                    handleGenerateKeyAndOpenDialog();
                 }}>
                     Yes, Generate New Kit
                 </AlertDialogAction>
@@ -325,6 +348,7 @@ export function SettingsPage() {
         open={isRecoveryKitOpen}
         onOpenChange={setRecoveryKitOpen}
         user={user}
+        secretKey={newlyGeneratedKey}
     />
     </>
   );
