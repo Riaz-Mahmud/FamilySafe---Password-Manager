@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
+import { PassphraseGenerator } from './passphrase-generator';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -231,6 +232,8 @@ export function AddPasswordDialog({
                     </FormItem>
                 )}
                 />
+
+                <PassphraseGenerator form={form} />
 
                 <FormField
                 control={form.control}
