@@ -4,20 +4,32 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { Skeleton } from '@/components/ui/skeleton';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { updateSessionLastSeen, findAndActivateByEmail } from '@/services/firestore';
 
 type AuthContextType = {
   user: User | null;
   loading: boolean;
+  refreshUser: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+const AuthContext = createContext<AuthContextType>({ 
+    user: null, 
+    loading: true, 
+    refreshUser: async () => {} 
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = async () => {
+    await auth.currentUser?.reload();
+    const freshUser = auth.currentUser;
+    // Create a new object from the reloaded user to ensure React detects the state change,
+    // preserving the User object's prototype and methods.
+    setUser(freshUser ? Object.assign(Object.create(Object.getPrototypeOf(freshUser)), freshUser) : null);
+  };
 
   useEffect(() => {
     let unsubscribeSession: () => void;
@@ -62,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

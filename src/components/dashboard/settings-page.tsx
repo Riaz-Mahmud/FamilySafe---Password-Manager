@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useRouter } from 'next/navigation';
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
@@ -46,6 +46,7 @@ export function SettingsPage() {
     setIsSaving(true);
     try {
       await updateUserProfile({ displayName });
+      await refreshUser(); // Refresh the user context to get the latest profile data
       toast({
         title: 'Profile Updated',
         description: 'Your display name has been successfully updated.',
