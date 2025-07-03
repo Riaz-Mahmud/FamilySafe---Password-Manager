@@ -14,6 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
@@ -22,7 +23,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit, Download, File as FileIcon, FileText as FileTextIcon, Image as ImageIcon, FolderLock } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Download, File as FileIcon, FileText as FileTextIcon, Image as ImageIcon, FolderLock, Eye } from 'lucide-react';
 import type { SecureDocument } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
@@ -32,6 +33,7 @@ type SecureDocumentListProps = {
   documents: SecureDocument[];
   onEdit: (document: SecureDocument) => void;
   onDelete: (id: string) => void;
+  onPreview: (document: SecureDocument) => void;
 };
 
 const iconMap: { [key: string]: React.ComponentType<any> } = {
@@ -42,7 +44,7 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
 
 const ITEMS_PER_PAGE = 30;
 
-export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocumentListProps) {
+export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: SecureDocumentListProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
   const totalPages = Math.ceil(documents.length / ITEMS_PER_PAGE);
@@ -116,10 +118,15 @@ export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocume
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => onPreview(doc)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Preview
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => onEdit(doc)}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
                                     onClick={() => onDelete(doc.id)}
@@ -194,6 +201,10 @@ export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocume
                           </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onPreview(doc)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Preview
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDownload(doc)}>
                             <Download className="mr-2 h-4 w-4" />
                             Download
@@ -202,6 +213,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocume
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
                             onClick={() => onDelete(doc.id)}

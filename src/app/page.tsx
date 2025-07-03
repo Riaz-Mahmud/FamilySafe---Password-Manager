@@ -87,6 +87,7 @@ import { Label } from '@/components/ui/label';
 import { sendInvitationEmailAction, shareCredentialAction } from '@/app/actions';
 import { AddSecureDocumentDialog } from '@/components/dashboard/add-secure-document-dialog';
 import { SecureDocumentList } from '@/components/dashboard/secure-document-list';
+import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-document-preview-dialog';
 
 
 export default function DashboardPage() {
@@ -114,6 +115,8 @@ export default function DashboardPage() {
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
   const [isTravelModeActive, setTravelModeActive] = useState(false);
+  const [isPreviewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [documentToPreview, setDocumentToPreview] = useState<SecureDocument | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -567,6 +570,18 @@ export default function DashboardPage() {
     }
     setAddDocumentDialogOpen(open);
   };
+  
+  const openPreviewDialog = (doc: SecureDocument) => {
+    setDocumentToPreview(doc);
+    setPreviewDialogOpen(true);
+  };
+
+  const handlePreviewDialogChange = (open: boolean) => {
+    if (!open) {
+      setDocumentToPreview(null);
+    }
+    setPreviewDialogOpen(open);
+  };
 
   const openAddFamilyMemberDialog = () => {
     setEditingFamilyMember(null);
@@ -703,6 +718,7 @@ export default function DashboardPage() {
             documents={filteredDocuments}
             onEdit={openEditDocumentDialog}
             onDelete={setDeleteDocumentTargetId}
+            onPreview={openPreviewDialog}
           />
         );
       case 'Family Members':
@@ -965,6 +981,12 @@ export default function DashboardPage() {
         user={user}
       />
       
+      <SecureDocumentPreviewDialog
+        open={isPreviewDialogOpen}
+        onOpenChange={handlePreviewDialogChange}
+        document={documentToPreview}
+      />
+
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
