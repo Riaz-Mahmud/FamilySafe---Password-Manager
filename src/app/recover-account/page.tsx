@@ -22,17 +22,21 @@ export default function RecoverAccountPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Call the secure server action
-    await recoverAccountAction({ email, secretKey });
+    const result = await recoverAccountAction({ email, secretKey });
 
-    // For security, always show a generic message to the user to prevent
-    // email enumeration or key-guessing attacks. The actual success/failure
-    // is handled on the server.
-    toast({
-      title: 'Check Your Email',
-      description: 'If your email and secret key are valid, you will receive a password reset link.',
-    });
-    
+    if (result.success) {
+      toast({
+        title: 'Check Your Email',
+        description: 'If your email and secret key are valid, you will receive a password reset link.',
+      });
+    } else {
+      toast({
+        title: 'Recovery Failed',
+        description: result.message,
+        variant: 'destructive',
+      });
+    }
+
     setIsLoading(false);
   };
 

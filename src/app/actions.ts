@@ -73,22 +73,13 @@ export async function recoverAccountAction(data: z.infer<typeof RecoverAccountSc
 
     if (!parsedData.success) {
       console.error('Server Action Validation Error:', parsedData.error.flatten());
-      // Return a generic error to the client to prevent leaking validation details.
       return { success: false, message: 'Invalid input data provided.' };
     }
 
-    // Call the recovery service
+    // Call the recovery service and return its result directly to the client.
+    // This provides detailed feedback for debugging configuration issues.
     const result = await recoverAccount(parsedData.data);
-    // We don't return the direct result to the client for security reasons (to prevent enumeration attacks).
-    // The client will always show a generic success message. The result is logged on the server.
-    if (result.success) {
-      console.log(`Recovery email sent for: ${data.email}`);
-    } else {
-      console.warn(`Failed recovery attempt for ${data.email}: ${result.message}`);
-    }
-    
-    // Always return a consistent response to the client.
-    return { success: true, message: 'Recovery process initiated.' };
+    return result;
 
   } catch (error: any) {
     console.error('Error in recoverAccountAction:', error);
