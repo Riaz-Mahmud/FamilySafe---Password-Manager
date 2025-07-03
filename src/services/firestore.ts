@@ -324,6 +324,41 @@ export async function findAndActivateByEmail(newUserUid: string, newUserEmail: s
     }
 }
 
+// --- User Data Management ---
+
+async function deleteCollection(collectionPath: string): Promise<void> {
+  const collectionRef = collection(db, collectionPath);
+  const q = query(collectionRef);
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    return;
+  }
+
+  const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
+  await Promise.all(deletePromises);
+}
+
+export async function deleteUserData(userId: string): Promise<void> {
+  // Delete all invitations sent by this user.
+  const invitationsRef = collection(db, 'invitations');
+  const userInvitationsQuery = query(invitationsRef, where('referrerId', '==', userId));
+  const userInvitationsSnap = await getDocs(userInvitationsQuery);
+  if (!userInvitationsSnap.empty) {
+    const deleteInvitationPromises = userInvitationsSnap.docs.map((doc) => deleteDoc(doc.ref));
+    await Promise.all(deleteInvitationPromises);
+  }
+  
+  // Delete all subcollections under the user's document.
+  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals'];
+  const deleteSubCollectionPromises = subcollections.map(sub => deleteCollection(`users/${userId}/${sub}`));
+  await Promise.all(deleteSubCollectionPromises);
+
+  // Finally, delete the user's main document.
+  const userDocRef = doc(db, 'users', userId);
+  await deleteDoc(userDocRef);
+}
+
 
 // --- Data Export ---
 

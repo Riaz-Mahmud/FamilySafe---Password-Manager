@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   type User,
+  deleteUser,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { addDeviceSession, revokeDeviceSession } from './firestore';
@@ -53,4 +54,12 @@ export async function updateUserProfile(profile: { displayName?: string; photoUR
     throw new Error('Not authenticated. Cannot update profile.');
   }
   await updateProfile(auth.currentUser, profile);
+}
+
+export async function deleteCurrentUser(): Promise<void> {
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('No user is currently signed in to be deleted.');
+    }
+    await deleteUser(user);
 }

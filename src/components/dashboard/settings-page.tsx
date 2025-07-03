@@ -8,18 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
-import { updateUserProfile, sendPasswordReset } from '@/services/auth';
-import { getUserDataForExport, getReferralCount } from '@/services/firestore';
+import { updateUserProfile, sendPasswordReset, deleteCurrentUser } from '@/services/auth';
+import { getUserDataForExport, getReferralCount, deleteUserData } from '@/services/firestore';
 import { Loader2, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useRouter } from 'next/navigation';
 
 export function SettingsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [referralLink, setReferralLink] = useState('');
   const [referralCount, setReferralCount] = useState(0);
 
@@ -117,13 +120,32 @@ export function SettingsPage() {
     });
   };
 
-  const handleDeleteAccount = () => {
-    toast({
-      title: 'Account Deletion Action',
-      description: 'Account deletion is a critical feature and is not fully enabled in this environment. A full implementation would require secure re-authentication.',
-      variant: 'destructive',
-      duration: 8000
-    });
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeleting(true);
+    try {
+      await deleteUserData(user.uid);
+      await deleteCurrentUser();
+      toast({
+        title: 'Account Deleted',
+        description: 'Your account and data have been permanently removed.',
+      });
+      router.push('/signup');
+    } catch (error: any) {
+      console.error('Account deletion failed:', error);
+      let errorMessage = 'An unexpected error occurred while deleting your account. Please try again.';
+      if (error.code === 'auth/requires-recent-login') {
+        errorMessage = 'This action requires a recent sign-in. Please log out and log back in to delete your account.';
+      }
+      toast({
+        title: 'Deletion Failed',
+        description: errorMessage,
+        variant: 'destructive',
+        duration: 8000
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
 
@@ -218,7 +240,10 @@ export function SettingsPage() {
             </p>
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive">Delete My Account</Button>
+                    <Button variant="destructive" disabled={isDeleting}>
+                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Delete My Account
+                    </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -228,8 +253,9 @@ export function SettingsPage() {
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         I understand, delete my account
                     </AlertDialogAction>
                     </AlertDialogFooter>
