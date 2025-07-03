@@ -237,7 +237,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onSend(credential)} disabled={credential.isShared}>
+                                    <DropdownMenuItem onClick={() => onSend(credential)}>
                                       <Mail className="mr-2 h-4 w-4" />
                                       Send Email
                                     </DropdownMenuItem>
@@ -303,8 +303,9 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
             <TableRow>
               <TableHead className="w-[40%]">Site / Application</TableHead>
               <TableHead className="w-[30%]">Username</TableHead>
+              <TableHead>Actions</TableHead>
               <TableHead>Sharing</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -342,50 +343,50 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                     </div>
                   </TableCell>
                   <TableCell>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                      <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopy(credential.password || '', 'Password')}
+                      >
+                          <Copy className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">Copy password</span>
+                      </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copy password</TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell>
                     {renderSharedWith(credential)}
                   </TableCell>
                   <TableCell className="text-right">
-                     <div className="flex items-center justify-end gap-2">
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopy(credential.password || '', 'Password')}
-                            >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy password
-                            </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Copy password</TooltipContent>
-                        </Tooltip>
-                        <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onSend(credential)} disabled={credential.isShared}>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Send Email
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => onDelete(credential.id)}
-                              disabled={credential.isShared}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                        </DropdownMenu>
-                     </div>
+                     <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onSend(credential)}>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Send Email
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => onDelete(credential.id)}
+                            disabled={credential.isShared}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                      </DropdownMenuContent>
+                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
