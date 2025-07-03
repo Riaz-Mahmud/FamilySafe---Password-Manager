@@ -10,7 +10,7 @@
 
 import { z } from 'zod';
 import sgMail from '@sendgrid/mail';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb, isFirebaseAdminInitialized } from '@/lib/firebase-admin';
 import { sha256 } from '@/lib/crypto';
 
 const AccountRecoveryInputSchema = z.object({
@@ -27,6 +27,19 @@ export type AccountRecoveryOutput = z.infer<typeof AccountRecoveryOutputSchema>;
 
 export async function recoverAccount(input: AccountRecoveryInput): Promise<AccountRecoveryOutput> {
   const { email, secretKey } = input;
+  
+  const sendGridApiKey = process.env.SENDGRID_API_KEY;
+  const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
+  
+  // Check if all necessary services are configured before proceeding
+  if (!isFirebaseAdminInitialized || !adminAuth || !adminDb || !sendGridApiKey || !sendGridFromEmail) {
+    const message = 'The account recovery feature is not fully configured on the server. Please contact support.';
+    console.error(message, {
+        firebaseAdmin: isFirebaseAdminInitialized,
+        sendGrid: !!sendGridApiKey && !!sendGridFromEmail,
+    });
+    return { success: false, message };
+  }
 
   try {
     // 1. Get user by email using Firebase Admin SDK
@@ -58,14 +71,6 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     const resetLink = await adminAuth.generatePasswordResetLink(email);
 
     // 5. Send the email using SendGrid
-    const sendGridApiKey = process.env.SENDGRID_API_KEY;
-    const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
-
-    if (!sendGridApiKey || !sendGridFromEmail) {
-      console.error('SendGrid environment variables not set.');
-      return { success: false, message: 'Email service is not configured on the server.' };
-    }
-
     sgMail.setApiKey(sendGridApiKey);
     const msg = {
       to: email,

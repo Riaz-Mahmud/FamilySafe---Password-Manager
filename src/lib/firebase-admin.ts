@@ -1,26 +1,46 @@
 
 import admin from 'firebase-admin';
 
+let isFirebaseAdminInitialized = false;
+
 // This prevents initialization on every hot-reload in development
 if (!admin.apps.length) {
-  try {
-    const serviceAccount = {
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // The private key must be formatted correctly.
-      // When stored in a .env file, newline characters are escaped.
-      // We need to replace them back to actual newlines.
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    };
-    
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: `https://{process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`
-    });
-  } catch (error: any) {
-    console.error('Firebase admin initialization error', error.stack);
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (!projectId || !clientEmail || !privateKey) {
+    const missingVars = [
+      !projectId && 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+      !clientEmail && 'FIREBASE_CLIENT_EMAIL',
+      !privateKey && 'FIREBASE_PRIVATE_KEY',
+    ].filter(Boolean).join(', ');
+
+    console.warn(`Firebase admin initialization skipped. Missing environment variables: ${missingVars}. Server-side features requiring admin privileges will be disabled.`);
+  } else {
+    try {
+      const serviceAccount = {
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n'),
+      };
+      
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: `https://${projectId}.firebaseio.com`
+      });
+      isFirebaseAdminInitialized = true;
+    } catch (error: any) {
+      console.error('Firebase admin initialization error', error);
+      // We don't re-throw to allow the app to run without admin features.
+    }
   }
+} else {
+    isFirebaseAdminInitialized = true;
 }
 
-export const adminAuth = admin.auth();
-export const adminDb = admin.firestore();
+// Conditionally export to avoid "app not initialized" errors in dependent files
+const adminAuth = isFirebaseAdminInitialized ? admin.auth() : null;
+const adminDb = isFirebaseAdminInitialized ? admin.firestore() : null;
+
+export { adminAuth, adminDb, isFirebaseAdminInitialized };
