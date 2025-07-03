@@ -6,13 +6,58 @@ FamilySafe is a modern, secure, and feature-rich password manager designed for f
 
 -   **Secure Credential Management**: Easily add, edit, and delete login credentials for all your websites and applications.
 -   **End-to-End Encryption**: Your sensitive data (usernames, passwords, notes) is encrypted on your device using AES-256 before being stored, ensuring only you can access it.
--   **Password Sharing**: Securely share specific credentials with family members you've added to your group.
+-   **Credential Tagging and Search**: Add custom tags (e.g., "bank", "work") to your credentials and use the powerful search to filter by site, username, or tag.
+-   **Password Sharing**: Securely share specific credentials with family members you've added to your group. Click on a family member to see all passwords shared with them.
 -   **Password Health Report**: Proactively improve your security with a comprehensive report that identifies weak, reused, or compromised passwords using the 'Have I Been Pwned' service securely.
 -   **Device Management**: View all devices that have logged into your account and remotely revoke access from any session you don't recognize or trust.
 -   **Audit Logs**: Keep track of all important activities in your account, including sign-ins, credential changes, and family member updates.
+-   **Data Export & Deletion**: In compliance with privacy regulations like GDPR & CCPA, you can export all your data or permanently delete your account.
 -   **Family Group Management**: Add or remove family members to control who you can share credentials with.
 -   **Settings & Profile Management**: Update your display name and manage your account security, including requesting password resets.
 -   **Support & FAQ**: Get help with common questions and contact support directly through the app.
+-   **Responsive Design**: A seamless experience across all your devices, from desktop to mobile.
+
+## Zero-Knowledge Encryption Architecture
+
+FamilySafe is built on a zero-knowledge security model. This means that your sensitive data is encrypted and decrypted locally on your device, and no one but you can access your unencrypted information—not even the FamilySafe team.
+
+The encryption key is derived from your user account details, which are only available to you after you have successfully authenticated. Your master password is never stored or transmitted.
+
+Here is a simple diagram illustrating the data flow:
+
+```
++--------------------------------+                          +--------------------------+
+|       Your Device (Browser)    |                          |    Firebase Servers      |
++--------------------------------+                          +--------------------------+
+|                                |                          |                          |
+|  [ Plaintext Credentials ]     | -- User saves/edits -->  |                          |
+|  (e.g., username, password)    |                          |                          |
+|                                |                          |                          |
+|              +                 |                          |                          |
+|              |                 |                          |                          |
+|  [ Your Unique User Key ]      |                          |                          |
+|  (Only you have this)          |                          |                          |
+|              |                 |                          |                          |
+|              v                 |                          |                          |
+|      AES-256 Encryption        |                          |                          |
+|              |                 |                          |                          |
+|              v                 |                          |                          |
+|  [ Encrypted Ciphertext ]      | <==== Transmitted ====>  |  [ Encrypted Ciphertext ]|
+|                                |      (over HTTPS)        |      (Stored in DB)      |
+|                                |                          |                          |
++--------------------------------+                          +--------------------------+
+```
+
+**How it works:**
+
+1.  **Input:** When you enter a password or a secure note, it exists only in your browser.
+2.  **Encryption:** Before this data is saved, it is encrypted directly on your device using the powerful AES-256 standard. The encryption key is unique to your user account and is only accessible after you log in.
+3.  **Transmission:** Only the encrypted ciphertext is sent over a secure HTTPS connection to our servers.
+4.  **Storage:** We only store the encrypted ciphertext in the database. We have no way to decrypt it.
+5.  **Decryption:** When you view your credentials, the encrypted ciphertext is sent back to your device, where it is decrypted locally using your unique key.
+
+This architecture ensures that your sensitive information never leaves your device in an unencrypted state, providing the highest level of security and privacy.
+
 
 ## Tech Stack
 
@@ -89,14 +134,4 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Contributing
 
-We’re looking for contributions in areas like:
-
--   **Localization and Internationalization**: Help translate FamilySafe into other languages.
--   **Browser Extension**: Building a browser extension for autofilling credentials.
--   **Integrations**: Developing a plugin or extension system for third-party integrations.
--   **Tooling**: Creating a secure CLI tool or API wrapper.
--   **Testing**: Improving our test coverage with unit and end-to-end testing.
--   **CI/CD**: Enhancing our CI/CD workflows.
--   **Analytics**: Designing a privacy-first analytics dashboard for credential health and usage insights.
-
-Whether you're a frontend developer, backend engineer, security enthusiast, or first-time open-source contributor, there’s a place for you in the FamilySafe project!
+We’re looking for contributions in areas like localization and internationalization (help translate FamilySafe into other languages), building a browser extension for autofilling credentials, developing a plugin or extension system for third-party integrations, creating a secure CLI tool or API wrapper, improving our test coverage with unit and end-to-end testing, enhancing our CI/CD workflows, and designing a privacy-first analytics dashboard for credential health and usage insights. Whether you're a frontend developer, backend engineer, security enthusiast, or first-time open-source contributor, there’s a place for you in the FamilySafe project!
