@@ -81,7 +81,7 @@ export function RecoveryKitDialog({
       `}</style>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl printable-recovery-kit">
-          <div id="recovery-kit-content" className="space-y-6">
+          <div id="recovery-kit-content" className="space-y-6 max-h-[80vh] overflow-y-auto p-1 pr-4 print:max-h-none print:overflow-visible">
             <DialogHeader className="text-left">
               <DialogTitle className="font-headline flex items-center gap-2">
                 <ShieldCheck className="h-7 w-7 text-primary" />
