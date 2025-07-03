@@ -154,8 +154,6 @@ export function AddPasswordDialog({
     onOpenChange(false);
   }
 
-  const activeFamilyMembers = familyMembers.filter(m => m.status === 'active');
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
@@ -354,21 +352,23 @@ export function AddPasswordDialog({
                         <Command>
                             <CommandInput placeholder="Search members..." />
                             <CommandList>
-                            <CommandEmpty>No active members found.</CommandEmpty>
+                            <CommandEmpty>No members found.</CommandEmpty>
                             <CommandGroup>
-                                {activeFamilyMembers.map(member => (
+                                {familyMembers.map(member => (
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
+                                    disabled={member.status !== 'active'}
                                     onSelect={() => {
-                                    const selectedValues = field.value || [];
-                                    const isSelected = selectedValues.includes(member.id);
-                                    form.setValue(
-                                        'sharedWith',
-                                        isSelected
-                                        ? selectedValues.filter(id => id !== member.id)
-                                        : [...selectedValues, member.id]
-                                    );
+                                      if (member.status !== 'active') return;
+                                      const selectedValues = field.value || [];
+                                      const isSelected = selectedValues.includes(member.id);
+                                      form.setValue(
+                                          'sharedWith',
+                                          isSelected
+                                          ? selectedValues.filter(id => id !== member.id)
+                                          : [...selectedValues, member.id]
+                                      );
                                     }}
                                 >
                                     <Check
@@ -378,6 +378,7 @@ export function AddPasswordDialog({
                                     )}
                                     />
                                     {member.name}
+                                    {member.status !== 'active' && <span className="text-xs text-muted-foreground ml-auto">(Pending)</span>}
                                 </CommandItem>
                                 ))}
                             </CommandGroup>
@@ -386,15 +387,16 @@ export function AddPasswordDialog({
                         </PopoverContent>
                     </Popover>
                     <FormDescription>
-                      Only family members who have accepted their invitation will appear here.
+                      You can only share with family members who have accepted their invitation.
                     </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
                         {field.value?.map(id => {
-                            const member = activeFamilyMembers.find(m => m.id === id);
+                            const member = familyMembers.find(m => m.id === id);
                             return member ? (
                                 <Badge variant="secondary" key={id} className="gap-1.5">
                                     {member.name}
                                     <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberId => memberId !== id))}
+                                    type="button"
                                     className="rounded-full hover:bg-muted-foreground/20"
                                     >
                                         <X className="h-3 w-3" />
