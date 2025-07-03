@@ -62,7 +62,7 @@ export async function sendInvitationEmail(input: SendInvitationEmailInput): Prom
         message: `An invitation email has been sent to ${input.email}.`,
       };
   } catch (error: any) {
-      console.error('Error sending invitation email via SendGrid:', error);
+      console.error('Error sending invitation email via SendGrid:', JSON.stringify(error, null, 2));
        if (error.response) {
           const sendGridErrorBody = error.response.body;
           if (sendGridErrorBody?.errors?.length > 0) {

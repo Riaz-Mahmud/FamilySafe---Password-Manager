@@ -63,7 +63,7 @@ export async function sendCredentialEmail(input: SendCredentialEmailInput): Prom
         message: `An email with the credentials for ${input.url} has been sent to the selected recipients.`,
       };
   } catch (error: any) {
-      console.error('Error sending email via SendGrid:', error);
+      console.error('Error sending credential email via SendGrid:', JSON.stringify(error, null, 2));
        if (error.response) {
           const sendGridErrorBody = error.response.body;
           if (sendGridErrorBody?.errors?.length > 0) {
