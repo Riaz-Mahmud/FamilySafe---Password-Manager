@@ -29,7 +29,7 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
   console.log(`[Recovery] Starting recovery process for: ${email}`);
   
   if (!isFirebaseAdminInitialized || !adminAuth || !adminDb) {
-    const message = 'The account recovery feature is not fully configured on the server (Firebase Admin). Please contact support.';
+    const message = 'Firebase Admin is not configured. This is required for Account Recovery. Please set `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` in your `.env` file. See README.md for details.';
     console.error(`[Recovery] Failure for ${email}: ${message}`);
     return { success: false, message };
   }
@@ -46,16 +46,13 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     const userDocRef = adminDb.doc(`users/${userId}`);
     const userDoc = await userDocRef.get();
 
-    if (!userDoc.exists) {
-      console.error(`[Recovery] Failure for ${email}: User document does not exist in Firestore.`);
-      return { success: false, message: 'User data not found.' };
+    if (!userDoc.exists || !userDoc.data()?.recoveryKeyHash) {
+      const reason = !userDoc.exists ? "User document does not exist" : "No recoveryKeyHash found";
+      console.error(`[Recovery] Failure for ${email}: ${reason}.`);
+      return { success: false, message: 'No recovery key has been set up for this account.' };
     }
 
     const storedHash = userDoc.data()?.recoveryKeyHash;
-    if (!storedHash) {
-      console.error(`[Recovery] Failure for ${email}: No recoveryKeyHash found in user document.`);
-      return { success: false, message: 'No recovery key has been set up for this account.' };
-    }
     console.log(`[Recovery] Found stored key hash for user: ${userId}`);
 
     // 3. Hash the provided secret key and compare with the stored hash
@@ -63,7 +60,7 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
 
     if (providedKeyHash !== storedHash) {
       console.warn(`[Recovery] Failure for ${email}: Provided key hash does not match stored hash.`);
-      return { success: false, message: 'The provided secret key is incorrect.' };
+      return { success: false, message: 'The email or secret key is incorrect. Please try again.' };
     }
 
     // 4. If hashes match, generate a password reset link
@@ -84,12 +81,14 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
       console.error(`[Recovery] Failed to send email to ${email}: ${emailResult.message}`);
     }
 
+    // Return the email service result directly. This will be 'success: true' if the email was sent,
+    // or 'success: false' with a specific error if it failed (e.g. bad SendGrid key).
     return emailResult;
 
   } catch (error: any) {
     if (error.code === 'auth/user-not-found') {
       console.warn(`[Recovery] Failure: No user found with email: ${email}`);
-      return { success: false, message: 'No user found with this email address.' };
+      return { success: false, message: 'The email or secret key is incorrect. Please try again.' };
     }
 
     console.error(`[Recovery] An unexpected error occurred for ${email}:`, error);
