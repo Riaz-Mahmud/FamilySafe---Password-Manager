@@ -75,10 +75,10 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
                         {session.isCurrent && <Badge variant="outline">This Device</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Last seen: {session.lastSeen}
+                        Last seen: {session.lastSeen?.toLocaleString()}
                       </p>
                        <p className="text-xs text-muted-foreground mt-1">
-                        First signed in: {session.createdAt}
+                        First signed in: {session.createdAt?.toLocaleString()}
                       </p>
                     </div>
                   </div>

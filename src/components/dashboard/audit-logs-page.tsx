@@ -49,7 +49,7 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
                 <CardContent className="p-4 space-y-2">
                     <div className="flex justify-between items-start gap-4">
                         <p className="font-medium">{log.action}</p>
-                        <p className="text-sm text-muted-foreground text-right shrink-0">{log.timestamp}</p>
+                        <p className="text-sm text-muted-foreground text-right shrink-0">{log.timestamp?.toLocaleString()}</p>
                     </div>
                     <p className="text-sm text-muted-foreground">{log.description}</p>
                 </CardContent>
@@ -72,7 +72,7 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
             <TableRow key={log.id}>
               <TableCell className="font-medium">{log.action}</TableCell>
               <TableCell>{log.description}</TableCell>
-              <TableCell className="text-right text-muted-foreground">{log.timestamp}</TableCell>
+              <TableCell className="text-right text-muted-foreground">{log.timestamp?.toLocaleString()}</TableCell>
             </TableRow>
           ))}
         </TableBody>

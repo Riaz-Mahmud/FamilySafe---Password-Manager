@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import {
@@ -192,7 +193,7 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                     </div>
                   </TableCell>
                   <TableCell>{formatFileSize(doc.fileSize)}</TableCell>
-                  <TableCell className="text-muted-foreground">{doc.lastModified}</TableCell>
+                  <TableCell className="text-muted-foreground">{doc.lastModified?.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>

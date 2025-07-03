@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import {
@@ -47,12 +48,12 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
 
 const ITEMS_PER_PAGE = 30;
 
-const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) => {
+const getExpiryStatus = (createdAt: Date | undefined, expiryMonths: number | undefined) => {
   if (!expiryMonths || expiryMonths === 0 || !createdAt) {
     return { status: 'ok', message: null };
   }
 
-  const createdDate = new Date(createdAt);
+  const createdDate = createdAt;
   if (isNaN(createdDate.getTime())) {
     return { status: 'ok', message: null };
   }

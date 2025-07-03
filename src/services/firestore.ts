@@ -1,4 +1,5 @@
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
 import {
@@ -89,7 +90,7 @@ export async function deleteVault(userId: string, vaultId: string): Promise<void
 
 export function getCredentialsForVault(userId: string, vaultId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const q = query(credentialsCol, where('vaultId', '==', vaultId), orderBy('lastModified', 'desc'));
+  const q = query(credentialsCol, where('vaultId', '==', vaultId));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const credentialsFromDb = snapshot.docs.map(doc => {
@@ -100,8 +101,8 @@ export function getCredentialsForVault(userId: string, vaultId: string, callback
           username: decryptData(data.username, userId),
           password: decryptData(data.password, userId),
           notes: decryptData(data.notes, userId),
-          lastModified: formatTimestamp(data.lastModified),
-          createdAt: formatTimestamp(data.createdAt),
+          lastModified: data.lastModified?.toDate(),
+          createdAt: data.createdAt?.toDate(),
           icon: data.icon,
           tags: data.tags || [],
           expiryMonths: data.expiryMonths,
@@ -109,6 +110,7 @@ export function getCredentialsForVault(userId: string, vaultId: string, callback
           vaultId: data.vaultId,
         } as Credential;
     });
+    credentialsFromDb.sort((a, b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(credentialsFromDb);
   }, (error) => {
     console.error("Error fetching credentials:", error);
@@ -266,7 +268,7 @@ export async function addAuditLog(userId: string, action: string, description: s
 
 export function getAuditLogs(userId: string, callback: (logs: AuditLog[]) => void): () => void {
     const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
-    const q = query(auditLogsCol, orderBy('timestamp', 'desc'));
+    const q = query(auditLogsCol);
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const logs = snapshot.docs.map(doc => {
@@ -275,9 +277,10 @@ export function getAuditLogs(userId: string, callback: (logs: AuditLog[]) => voi
                 id: doc.id,
                 action: data.action,
                 description: data.description,
-                timestamp: formatTimestamp(data.timestamp),
+                timestamp: data.timestamp?.toDate(),
             } as AuditLog;
         });
+        logs.sort((a,b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0));
         callback(logs);
     }, (error) => {
         console.error("Error fetching audit logs:", error);
@@ -328,7 +331,7 @@ export function getDeviceSessions(
   callback: (sessions: DeviceSession[]) => void
 ): () => void {
   const sessionsCol = collection(db, 'users', userId, 'sessions');
-  const q = query(sessionsCol, orderBy('lastSeen', 'desc'));
+  const q = query(sessionsCol);
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const sessions = snapshot.docs.map(doc => {
@@ -336,11 +339,12 @@ export function getDeviceSessions(
       return {
         id: doc.id,
         userAgent: data.userAgent,
-        createdAt: formatTimestamp(data.createdAt),
-        lastSeen: formatTimestamp(data.lastSeen),
+        createdAt: data.createdAt?.toDate(),
+        lastSeen: data.lastSeen?.toDate(),
         isCurrent: doc.id === currentSessionId,
       } as DeviceSession;
     });
+    sessions.sort((a,b) => (b.lastSeen?.getTime() || 0) - (a.lastSeen?.getTime() || 0));
     callback(sessions);
   }, (error) => {
     console.error("Error fetching device sessions:", error);
@@ -359,7 +363,7 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
 
 export function getSecureDocumentsForVault(userId: string, vaultId: string, callback: (documents: SecureDocument[]) => void): () => void {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
-  const q = query(documentsCol, where('vaultId', '==', vaultId), orderBy('lastModified', 'desc'));
+  const q = query(documentsCol, where('vaultId', '==', vaultId));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const documents = snapshot.docs.map(doc => {
@@ -372,11 +376,12 @@ export function getSecureDocumentsForVault(userId: string, vaultId: string, call
           fileType: data.fileType,
           fileSize: data.fileSize,
           icon: data.icon,
-          lastModified: formatTimestamp(data.lastModified),
-          createdAt: formatTimestamp(data.createdAt),
+          lastModified: data.lastModified?.toDate(),
+          createdAt: data.createdAt?.toDate(),
           vaultId: data.vaultId,
         } as SecureDocument;
     });
+    documents.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(documents);
   }, (error) => {
     console.error("Error fetching secure documents:", error);

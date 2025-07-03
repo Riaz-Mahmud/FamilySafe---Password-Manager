@@ -1,4 +1,5 @@
 
+
 export interface Vault {
   id: string;
   name: string;
@@ -11,8 +12,8 @@ export interface Credential {
   username: string;
   password: string;
   notes: string;
-  lastModified: string;
-  createdAt: string;
+  lastModified?: Date;
+  createdAt?: Date;
   icon: string;
   tags: string[];
   expiryMonths?: number;
@@ -33,14 +34,14 @@ export interface AuditLog {
   id:string;
   action: string;
   description: string;
-  timestamp: string;
+  timestamp?: Date;
 }
 
 export interface DeviceSession {
   id: string;
   userAgent: string;
-  lastSeen: string;
-  createdAt: string;
+  lastSeen?: Date;
+  createdAt?: Date;
   isCurrent: boolean;
 }
 
@@ -51,8 +52,8 @@ export interface SecureDocument {
   fileDataUrl: string; // encrypted
   fileType: string;
   fileSize: number;
-  lastModified: string;
-  createdAt: string;
+  lastModified?: Date;
+  createdAt?: Date;
   icon: string; // lucide icon name
   vaultId: string;
 }
