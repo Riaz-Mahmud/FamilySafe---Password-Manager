@@ -27,25 +27,50 @@ function formatTimestamp(timestamp: Timestamp | undefined): string {
 }
 
 
-// --- Credentials ---
+// --- Credentials & Revocations ---
 
-async function checkShareValidity(cred: Credential): Promise<boolean> {
-  // Only validate credentials that look like they were shared with the new system.
-  if (!cred.isShared || !cred.ownerUid || !cred.sourceCredentialId) {
-    return true;
+/**
+ * Checks a list of shared credentials against the revocations collection.
+ * @param credentialsToCheck An array of credentials that are copies from another user.
+ * @returns A Set containing the sourceCredentialId of any credential that has been revoked by its owner.
+ */
+export async function getRevokedSourceIds(credentialsToCheck: Credential[]): Promise<Set<string>> {
+  if (credentialsToCheck.length === 0) {
+    return new Set();
   }
-  try {
-    const sourceDocRef = doc(db, 'users', cred.ownerUid, 'credentials', cred.sourceCredentialId);
-    const sourceDocSnap = await getDoc(sourceDocRef);
-    // If the owner's original credential doesn't exist anymore, this share is invalid.
-    return sourceDocSnap.exists();
-  } catch (error) {
-    // This will likely be a permissions error if rules are strict.
-    // In that case, we can't validate, so we don't delete.
-    // Log the error for debugging but assume the share is still valid to prevent data loss.
-    console.warn(`Could not validate share for credential "${cred.url}". It might be inaccessible or the owner has restrictive security rules.`);
-    return true;
+
+  const revokedIds = new Set<string>();
+  const checksByOwner = new Map<string, string[]>();
+
+  // Group checks by owner to reduce the number of queries needed.
+  for (const cred of credentialsToCheck) {
+    if (cred.ownerUid && cred.sourceCredentialId) {
+      if (!checksByOwner.has(cred.ownerUid)) {
+        checksByOwner.set(cred.ownerUid, []);
+      }
+      checksByOwner.get(cred.ownerUid)!.push(cred.sourceCredentialId);
+    }
   }
+
+  // Firestore 'in' queries support up to 30 elements per query.
+  // We'll iterate through each owner's list and chunk the queries if necessary.
+  const revocationQueries = Array.from(checksByOwner.entries()).map(async ([ownerUid, sourceIds]) => {
+    for (let i = 0; i < sourceIds.length; i += 30) {
+      const chunk = sourceIds.slice(i, i + 30);
+      const q = query(
+        collection(db, 'revocations'),
+        where('ownerUid', '==', ownerUid),
+        where('sourceCredentialId', 'in', chunk)
+      );
+      const snapshot = await getDocs(q);
+      snapshot.forEach(doc => {
+        revokedIds.add(doc.data().sourceCredentialId);
+      });
+    }
+  });
+
+  await Promise.all(revocationQueries);
+  return revokedIds;
 }
 
 export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
@@ -53,7 +78,6 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
   const q = query(credentialsCol, orderBy('lastModified', 'desc'));
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
-    // This is an async callback, so we can do async work inside.
     (async () => {
       const credentialsFromDb: Credential[] = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -78,35 +102,33 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           } as Credential;
       });
 
-      const validatedCredentials: Credential[] = [];
-      const validationPromises = credentialsFromDb.map(async (cred) => {
-        const isValid = await checkShareValidity(cred);
-        return { cred, isValid };
-      });
-      
-      const results = await Promise.all(validationPromises);
-      const staleCredentialIds: string[] = [];
+      const ownCredentials = credentialsFromDb.filter(c => !c.isShared);
+      const sharedCredentials = credentialsFromDb.filter(c => c.isShared);
 
-      results.forEach(result => {
-        if (result.isValid) {
-          validatedCredentials.push(result.cred);
+      const revokedSourceIds = await getRevokedSourceIds(sharedCredentials);
+
+      const validSharedCredentials: Credential[] = [];
+      const staleCredentialsToDelete: string[] = [];
+
+      for (const cred of sharedCredentials) {
+        if (cred.sourceCredentialId && revokedSourceIds.has(cred.sourceCredentialId)) {
+          staleCredentialsToDelete.push(cred.id);
         } else {
-          staleCredentialIds.push(result.cred.id);
-        }
-      });
-      
-      // Update UI right away with valid credentials.
-      callback(validatedCredentials);
-      
-      // Asynchronously delete stale credentials in the background.
-      if (staleCredentialIds.length > 0) {
-        console.log(`Found ${staleCredentialIds.length} stale shared credential(s) to remove.`);
-        for (const id of staleCredentialIds) {
-          // This deletion will trigger the onSnapshot listener again, which will re-render the UI with the updated list.
-          deleteCredential(userId, id).catch(err => console.error(`Failed to delete stale credential ${id}`, err));
+          validSharedCredentials.push(cred);
         }
       }
 
+      const finalCredentials = [...ownCredentials, ...validSharedCredentials];
+      callback(finalCredentials);
+
+      // Asynchronously delete stale credentials in the background.
+      if (staleCredentialsToDelete.length > 0) {
+        console.log(`Found ${staleCredentialsToDelete.length} revoked shared credential(s) to remove.`);
+        for (const id of staleCredentialsToDelete) {
+          // This deletion will trigger onSnapshot again, updating the UI.
+          deleteDoc(doc(db, 'users', userId, 'credentials', id)).catch(err => console.error(`Failed to delete revoked credential ${id}`, err));
+        }
+      }
     })();
   }, (error) => {
     console.error("Error fetching credentials:", error);
@@ -178,6 +200,18 @@ export async function updateCredential(userId: string, id: string, credential: P
 
 export async function deleteCredential(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
+  
+  // Create a revocation record *before* deleting the document.
+  // This notifies any recipients that the original credential has been deleted.
+  // This applies to all deletion, not just shared items, for simplicity.
+  // If the item wasn't shared, the revocation record is harmless.
+  const revocationData = {
+    ownerUid: userId,
+    sourceCredentialId: id,
+    timestamp: serverTimestamp(),
+  };
+  await addDoc(collection(db, 'revocations'), revocationData);
+
   await deleteDoc(docRef);
 }
 
