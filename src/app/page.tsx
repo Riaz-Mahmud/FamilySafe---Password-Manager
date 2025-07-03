@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -329,24 +330,42 @@ export default function DashboardPage() {
     setSendEmailDialogOpen(true);
   };
 
+  const handleSelectFamilyMember = (memberId: string) => {
+    setSelectedFamilyMemberId(memberId);
+    setActiveMenu('All Passwords');
+    setSearchTerm('');
+  };
+
+  const handleMenuClick = (menu: string) => {
+    setActiveMenu(menu);
+    setSelectedFamilyMemberId(null);
+    setSearchTerm('');
+  };
+
   const filteredCredentials = credentials.filter(credential => {
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    
-    const searchMatch =
-      credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
-      credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
-      (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+      // Filter by active menu first, as it's the primary mode
+      if (activeMenu === 'My Passwords') {
+        if (credential.sharedWith.length !== 0) return false;
+      }
 
+      // Filter by selected family member if a member is selected
+      if (selectedFamilyMemberId) {
+        if (!credential.sharedWith.includes(selectedFamilyMemberId)) {
+          return false;
+        }
+      }
 
-    if (!searchMatch) {
-      return false;
-    }
-
-    if (activeMenu === 'My Passwords') {
-      return credential.sharedWith.length === 0;
-    }
-    
-    return true;
+      // Then, filter by search term
+      if (searchTerm) {
+          const lowerCaseSearchTerm = searchTerm.toLowerCase();
+          const searchMatch =
+          credential.url.toLowerCase().includes(lowerCaseSearchTerm) ||
+          credential.username.toLowerCase().includes(lowerCaseSearchTerm) ||
+          (credential.tags && credential.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+          if (!searchMatch) return false;
+      }
+      
+      return true;
   });
 
   if (authLoading) {
@@ -387,6 +406,7 @@ export default function DashboardPage() {
             familyMembers={familyMembers}
             onEdit={openEditFamilyMemberDialog}
             onDelete={setDeleteFamilyMemberTargetId}
+            onMemberSelect={handleSelectFamilyMember}
           />
         );
       case 'Password Health Report':
@@ -404,6 +424,13 @@ export default function DashboardPage() {
     }
   };
 
+  const activeFamilyMember = selectedFamilyMemberId
+    ? familyMembers.find((m) => m.id === selectedFamilyMemberId)
+    : null;
+
+  const pageTitle = activeFamilyMember
+    ? `Passwords Shared with ${activeFamilyMember.name}`
+    : activeMenu;
 
   return (
     <SidebarProvider>
@@ -415,8 +442,8 @@ export default function DashboardPage() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('All Passwords')}
-                isActive={activeMenu === 'All Passwords'}
+                onClick={() => handleMenuClick('All Passwords')}
+                isActive={activeMenu === 'All Passwords' && !selectedFamilyMemberId}
                 tooltip="All Passwords"
               >
                 <Home />
@@ -425,7 +452,7 @@ export default function DashboardPage() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('My Passwords')}
+                onClick={() => handleMenuClick('My Passwords')}
                 isActive={activeMenu === 'My Passwords'}
                 tooltip="My Passwords"
               >
@@ -435,7 +462,7 @@ export default function DashboardPage() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Family Members')}
+                onClick={() => handleMenuClick('Family Members')}
                 isActive={activeMenu === 'Family Members'}
                 tooltip="Family Members"
               >
@@ -445,7 +472,7 @@ export default function DashboardPage() {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Password Health Report')}
+                onClick={() => handleMenuClick('Password Health Report')}
                 isActive={activeMenu === 'Password Health Report'}
                 tooltip="Password Health Report"
               >
@@ -455,7 +482,7 @@ export default function DashboardPage() {
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Audit Logs')}
+                onClick={() => handleMenuClick('Audit Logs')}
                 isActive={activeMenu === 'Audit Logs'}
                 tooltip="Audit Logs"
               >
@@ -465,7 +492,7 @@ export default function DashboardPage() {
             </SidebarMenuItem>
              <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Device Management')}
+                onClick={() => handleMenuClick('Device Management')}
                 isActive={activeMenu === 'Device Management'}
                 tooltip="Device Management"
               >
@@ -478,14 +505,14 @@ export default function DashboardPage() {
         <SidebarFooter className="mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setActiveMenu('Support')} isActive={activeMenu === 'Support'} tooltip="Support">
+              <SidebarMenuButton onClick={() => handleMenuClick('Support')} isActive={activeMenu === 'Support'} tooltip="Support">
                 <LifeBuoy />
                 Support
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={() => setActiveMenu('Settings')}
+                onClick={() => handleMenuClick('Settings')}
                 isActive={activeMenu === 'Settings'}
                 tooltip="Settings"
               >
@@ -545,7 +572,7 @@ export default function DashboardPage() {
           </header>
 
           <main className="flex-1 overflow-y-auto">
-            <h1 className="text-3xl font-bold font-headline mb-6">{activeMenu}</h1>
+            <h1 className="text-3xl font-bold font-headline mb-6">{pageTitle}</h1>
             {renderContent()}
           </main>
         </div>
