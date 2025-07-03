@@ -12,6 +12,7 @@ import {
   query,
   orderBy,
   onSnapshot,
+  getDocs,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '@/lib/crypto';
 
@@ -212,4 +213,64 @@ export function getDeviceSessions(
 export async function revokeDeviceSession(userId: string, sessionId: string): Promise<void> {
   const sessionRef = doc(db, 'users', userId, 'sessions', sessionId);
   await deleteDoc(sessionRef);
+}
+
+// --- Data Export ---
+
+export async function getUserDataForExport(userId: string): Promise<object> {
+    const credentialsCol = collection(db, 'users', userId, 'credentials');
+    const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
+    const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
+    const sessionsCol = collection(db, 'users', userId, 'sessions');
+
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap] = await Promise.all([
+        getDocs(query(credentialsCol, orderBy('lastModified', 'desc'))),
+        getDocs(familyMembersCol),
+        getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
+        getDocs(query(sessionsCol, orderBy('lastSeen', 'desc'))),
+    ]);
+
+    const credentials = credentialsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            url: data.url,
+            username: decryptData(data.username, userId),
+            password: decryptData(data.password, userId),
+            notes: decryptData(data.notes, userId),
+            lastModified: formatTimestamp(data.lastModified),
+            sharedWith: data.sharedWith || [],
+            icon: data.icon,
+            tags: data.tags || [],
+        };
+    });
+
+    const familyMembers = familyMembersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    const auditLogs = auditLogsSnap.docs.map(doc => {
+         const data = doc.data();
+         return {
+            id: doc.id,
+            action: data.action,
+            description: data.description,
+            timestamp: formatTimestamp(data.timestamp),
+        };
+    });
+
+    const deviceSessions = sessionsSnap.docs.map(doc => {
+         const data = doc.data();
+         return {
+            id: doc.id,
+            userAgent: data.userAgent,
+            createdAt: formatTimestamp(data.createdAt),
+            lastSeen: formatTimestamp(data.lastSeen),
+         };
+    });
+    
+    return {
+        credentials,
+        familyMembers,
+        auditLogs,
+        deviceSessions,
+    };
 }

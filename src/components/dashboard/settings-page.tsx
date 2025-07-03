@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { updateUserProfile, sendPasswordReset } from '@/services/auth';
+import { getUserDataForExport } from '@/services/firestore';
 import { Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export function SettingsPage() {
   const { user } = useAuth();
@@ -17,6 +19,7 @@ export function SettingsPage() {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +61,47 @@ export function SettingsPage() {
         setIsSendingReset(false);
     }
   };
+  
+  const handleExportData = async () => {
+    if (!user) return;
+    setIsExporting(true);
+    try {
+        const data = await getUserDataForExport(user.uid);
+        const jsonString = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `familysafe_export_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast({
+            title: 'Export Successful',
+            description: 'Your data has been downloaded as a JSON file.',
+        });
+    } catch (error) {
+        console.error('Failed to export data:', error);
+        toast({
+            title: 'Export Failed',
+            description: 'Could not export your data. Please try again.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+  
+  const handleDeleteAccount = () => {
+    toast({
+      title: 'Account Deletion Action',
+      description: 'Account deletion is a critical feature and is not fully enabled in this environment. A full implementation would require secure re-authentication.',
+      variant: 'destructive',
+      duration: 8000
+    });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -108,17 +152,45 @@ export function SettingsPage() {
         </CardContent>
       </Card>
       
-      <Card className="border-destructive">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-destructive">Delete Account</CardTitle>
-          <CardDescription>
-            Permanently delete your account and all associated data. This action cannot be undone.
-          </CardDescription>
+          <CardTitle>Data &amp; Privacy</CardTitle>
+          <CardDescription>Manage and download your personal data.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={() => toast({ title: 'Info', description: 'Account deletion is not yet implemented.' })}>
-            Delete My Account
-          </Button>
+        <CardContent className="space-y-6">
+           <div className="space-y-2">
+            <h3 className="font-medium">Export Your Data</h3>
+            <p className="text-sm text-muted-foreground">Download a copy of all your data, including credentials and family members, in a JSON format.</p>
+            <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
+              {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Export My Data
+            </Button>
+          </div>
+          <div className="space-y-2 p-4 border rounded-lg border-destructive/50">
+            <h3 className="font-medium text-destructive">Delete Account</h3>
+            <p className="text-sm text-muted-foreground">
+              Permanently delete your account and all associated data. This action is irreversible.
+            </p>
+             <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive">Delete My Account</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account and all of your data from our servers. Please export your data first if you wish to keep a copy.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive hover:bg-destructive/90">
+                        I understand, delete my account
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </CardContent>
       </Card>
     </div>
