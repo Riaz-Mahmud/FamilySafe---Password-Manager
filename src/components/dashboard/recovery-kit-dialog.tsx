@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Dialog,
   DialogContent,
@@ -131,7 +132,7 @@ export function RecoveryKitDialog({
 
             <div className="text-sm space-y-2 pt-4 border-t">
                 <h3 className="font-bold">How to Use This Kit</h3>
-                <p>1. Go to the FamilySafe account recovery page.</p>
+                <p>1. Go to the <Link href="/recover-account" className="font-medium text-primary underline underline-offset-4">FamilySafe account recovery page</Link>.</p>
                 <p>2. Scan the QR code or manually enter your Account Email and Secret Recovery Key.</p>
                 <p>3. Follow the on-screen instructions to reset your master password and regain access to your vault.</p>
             </div>
