@@ -29,6 +29,7 @@ import {
   History,
   MonitorSmartphone,
   Plane,
+  Share2,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -467,6 +468,8 @@ export default function DashboardPage() {
       // Filter by active menu second, as it's the primary mode
       if (activeMenu === 'My Passwords') {
         if (credential.isShared) return false;
+      } else if (activeMenu === 'Shared Passwords') {
+        if (!credential.isShared) return false;
       }
 
       // Filter by selected family member if a member is selected
@@ -512,6 +515,7 @@ export default function DashboardPage() {
     switch (activeMenu) {
       case 'All Passwords':
       case 'My Passwords':
+      case 'Shared Passwords':
         return (
           <PasswordList
             credentials={filteredCredentials}
@@ -581,6 +585,16 @@ export default function DashboardPage() {
               >
                 <Shield />
                 My Passwords
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => handleMenuClick('Shared Passwords')}
+                isActive={activeMenu === 'Shared Passwords'}
+                tooltip="Shared Passwords"
+              >
+                <Share2 />
+                Shared Passwords
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -696,6 +710,16 @@ export default function DashboardPage() {
                   <span className="hidden md:inline">Add Credential</span>
                 </Button>
               </>
+            ) : activeMenu === 'Shared Passwords' ? (
+               <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    placeholder="Search passwords by site, username, or tag..."
+                    className="pl-10 w-full max-w-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
             ) : activeMenu === 'Family Members' ? (
               <>
                 <div className="flex-1" />
