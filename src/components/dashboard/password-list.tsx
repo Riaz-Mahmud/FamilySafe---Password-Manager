@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -30,6 +29,7 @@ import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail,
 import type { Credential, FamilyMember } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { addMonths, differenceInDays, format, isPast } from 'date-fns';
+import { useState } from 'react';
 
 type PasswordListProps = {
   credentials: Credential[];
@@ -46,6 +46,8 @@ const iconMap: { [key: string]: React.ComponentType<any> } = {
   Globe,
   Bot,
 };
+
+const ITEMS_PER_PAGE = 30;
 
 const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) => {
   if (!expiryMonths || expiryMonths === 0 || !createdAt) {
@@ -75,6 +77,12 @@ const getExpiryStatus = (createdAt: string, expiryMonths: number | undefined) =>
 
 export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onSend, onMemberSelect, isTravelModeActive }: PasswordListProps) {
   const { toast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(credentials.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentCredentials = credentials.slice(startIndex, endIndex);
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -141,19 +149,18 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   }
 
   const renderSharedWith = (credential: Credential) => {
-    const sharedWithIds = credential.sharedWith || [];
-
+    const sharedWithEmails = credential.sharedWith || [];
+    
     if (credential.isShared) {
-        const sharedByNote = credential.notes?.split('\n\n')[0] || 'Shared by someone';
-        return <Badge variant="outline">{sharedByNote}</Badge>;
+        return <Badge variant="outline">Shared with me</Badge>;
     }
 
-    if (sharedWithIds.length === 0) {
+    if (sharedWithEmails.length === 0) {
         return <Badge variant="outline">Only You</Badge>;
     }
 
     const sharedWithMembers = familyMembers.filter(member =>
-      sharedWithIds.includes(member.id)
+      sharedWithEmails.includes(member.email!)
     );
     
     if (sharedWithMembers.length > 0) {
@@ -202,7 +209,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     <TooltipProvider>
       {/* Mobile View */}
       <div className="md:hidden space-y-4">
-        {credentials.map(credential => {
+        {currentCredentials.map(credential => {
             const IconComponent = iconMap[credential.icon] || Globe;
             return (
                 <Card key={credential.id} className="w-full">
@@ -299,7 +306,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
             </TableRow>
           </TableHeader>
           <TableBody>
-            {credentials.map(credential => {
+            {currentCredentials.map(credential => {
               const IconComponent = iconMap[credential.icon] || Globe;
               return (
                 <TableRow key={credential.id}>
@@ -384,6 +391,29 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
           </TableBody>
         </Table>
       </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </TooltipProvider>
   );
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { DeviceSession } from '@/types';
@@ -8,11 +7,14 @@ import { Monitor, Smartphone, Tablet } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import UAParser from 'ua-parser-js';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useState } from 'react';
 
 type DeviceManagementPageProps = {
   sessions: DeviceSession[];
   onRevoke: (sessionId: string) => void;
 };
+
+const ITEMS_PER_PAGE = 30;
 
 function getDeviceIcon(deviceType: string | undefined) {
     switch(deviceType) {
@@ -26,6 +28,12 @@ function getDeviceIcon(deviceType: string | undefined) {
 }
 
 export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPageProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(sessions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentSessions = sessions.slice(startIndex, endIndex);
 
   if (sessions.length === 0) {
     return (
@@ -51,7 +59,7 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
         </CardHeader>
         <CardContent>
           <ul className="divide-y">
-            {sessions.map((session) => {
+            {currentSessions.map((session) => {
               const parser = new UAParser(session.userAgent);
               const result = parser.getResult();
               const deviceName = result.browser.name ? `${result.browser.name} on ${result.os.name}` : 'Unknown Device';
@@ -107,6 +115,29 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
           </ul>
         </CardContent>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end space-x-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

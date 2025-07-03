@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { AuditLog } from '@/types';
@@ -12,12 +11,23 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { History } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 type AuditLogsPageProps = {
   logs: AuditLog[];
 };
 
+const ITEMS_PER_PAGE = 30;
+
 export function AuditLogsPage({ logs }: AuditLogsPageProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(logs.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentLogs = logs.slice(startIndex, endIndex);
+
   if (logs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
@@ -34,7 +44,7 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
     <>
     {/* Mobile View */}
     <div className="md:hidden space-y-3">
-        {logs.map((log) => (
+        {currentLogs.map((log) => (
             <Card key={log.id}>
                 <CardContent className="p-4 space-y-2">
                     <div className="flex justify-between items-start gap-4">
@@ -58,7 +68,7 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {logs.map((log) => (
+          {currentLogs.map((log) => (
             <TableRow key={log.id}>
               <TableCell className="font-medium">{log.action}</TableCell>
               <TableCell>{log.description}</TableCell>
@@ -68,6 +78,30 @@ export function AuditLogsPage({ logs }: AuditLogsPageProps) {
         </TableBody>
       </Table>
     </div>
+    
+    {totalPages > 1 && (
+      <div className="flex items-center justify-end space-x-2 py-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          Previous
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          disabled={currentPage === totalPages}
+        >
+          Next
+        </Button>
+      </div>
+    )}
     </>
   );
 }
