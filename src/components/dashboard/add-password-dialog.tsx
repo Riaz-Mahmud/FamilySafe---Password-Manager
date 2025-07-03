@@ -281,7 +281,7 @@ export function AddPasswordDialog({
                     <FormItem>
                     <FormLabel>Tags (optional)</FormLabel>
                     <FormControl>
-                        <>
+                        <div>
                         <div className="flex flex-wrap gap-2 mb-2">
                             {field.value?.map((tag, index) => (
                             <Badge variant="secondary" key={index} className="gap-1.5">
@@ -315,7 +315,7 @@ export function AddPasswordDialog({
                             }}
                             placeholder="Type a tag and press Enter"
                         />
-                        </>
+                        </div>
                     </FormControl>
                     <FormMessage />
                     </FormItem>
