@@ -236,6 +236,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                     <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
                                     onClick={() => onDelete(credential.id)}
+                                    disabled={credential.isShared}
                                     >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Delete
@@ -368,6 +369,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => onDelete(credential.id)}
+                              disabled={credential.isShared}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
