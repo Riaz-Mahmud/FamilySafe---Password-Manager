@@ -62,6 +62,11 @@ export async function sendInvitationEmailAction(data: z.infer<typeof SendInvitat
   }
 }
 
+const ShareCredentialRecipientSchema = z.object({
+  uid: z.string(),
+  email: z.string().email(),
+});
+
 const ShareCredentialDataSchema = z.object({
   url: z.string(),
   username: z.string(),
@@ -73,7 +78,7 @@ const ShareCredentialDataSchema = z.object({
 
 const ShareCredentialSchema = z.object({
   fromName: z.string(),
-  toUids: z.array(z.string()),
+  toRecipients: z.array(ShareCredentialRecipientSchema),
   credential: ShareCredentialDataSchema,
 });
 
@@ -85,19 +90,20 @@ export async function shareCredentialAction(data: z.infer<typeof ShareCredential
       return { success: false, message: 'Invalid input data for sharing.' };
     }
 
-    const { fromName, toUids, credential } = parsedData.data;
+    const { fromName, toRecipients, credential } = parsedData.data;
 
-    for (const toUid of toUids) {
+    for (const recipient of toRecipients) {
       // Create a new credential object for the recipient
       const credentialForRecipient = {
         ...credential,
         notes: `Shared by ${fromName}.\n\n${credential.notes || ''}`,
         sharedWith: [], // A shared credential cannot be re-shared by the recipient
         isShared: true, // Mark that this credential was shared
+        sharedTo: recipient.email, // Set recipient's email
       };
       
       // Add the credential to the recipient's account
-      await addCredential(toUid, credentialForRecipient);
+      await addCredential(recipient.uid, credentialForRecipient);
     }
 
     return { success: true, message: 'Credential shared successfully.' };

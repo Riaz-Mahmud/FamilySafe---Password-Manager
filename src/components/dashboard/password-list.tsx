@@ -141,9 +141,21 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   }
 
   const renderSharedWith = (credential: Credential) => {
+    const sharedWithEmails = credential.sharedWith || [];
+
+    if (credential.isShared) {
+        const sharedByNote = credential.notes?.split('\n\n')[0] || 'Shared by someone';
+        return <Badge variant="outline">{sharedByNote}</Badge>;
+    }
+
+    if (sharedWithEmails.length === 0) {
+        return <Badge variant="outline">Only You</Badge>;
+    }
+
     const sharedWithMembers = familyMembers.filter(member =>
-      credential.sharedWith.includes(member.id)
+      sharedWithEmails.includes(member.email || '')
     );
+    
     if (sharedWithMembers.length > 0) {
       return (
         <div className="flex items-center">

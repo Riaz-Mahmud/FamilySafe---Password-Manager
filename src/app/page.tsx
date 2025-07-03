@@ -181,18 +181,19 @@ export default function DashboardPage() {
 
   const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>, originalSharedWith: string[] = []) => {
       if (!user) return;
-      const newSharedWith = credential.sharedWith || [];
-      const addedMemberIds = newSharedWith.filter(id => !originalSharedWith.includes(id));
       
-      if (addedMemberIds.length > 0) {
+      const newSharedWithEmails = credential.sharedWith || [];
+      const addedEmails = newSharedWithEmails.filter(email => !originalSharedWith.includes(email));
+
+      if (addedEmails.length > 0) {
           const membersToShareWith = familyMembers.filter(fm => 
-              addedMemberIds.includes(fm.id) && fm.uid
+              addedEmails.includes(fm.email || '') && fm.uid && fm.email
           );
 
           if (membersToShareWith.length > 0) {
               const result = await shareCredentialAction({
                   fromName: user.displayName || user.email!,
-                  toUids: membersToShareWith.map(m => m.uid!),
+                  toRecipients: membersToShareWith.map(m => ({ uid: m.uid!, email: m.email! })),
                   credential: {
                       url: credential.url,
                       username: credential.username,

@@ -7,12 +7,13 @@ export interface Credential {
   notes: string;
   lastModified: string;
   createdAt: string;
-  sharedWith: string[]; // array of family member IDs
+  sharedWith: string[]; // array of family member emails
   icon: string;
   tags: string[];
   expiryMonths?: number;
   safeForTravel?: boolean;
   isShared?: boolean;
+  sharedTo?: string;
 }
 
 export interface FamilyMember {

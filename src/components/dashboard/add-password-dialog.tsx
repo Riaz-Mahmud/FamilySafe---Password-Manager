@@ -358,26 +358,28 @@ export function AddPasswordDialog({
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
+                                    disabled={!member.email}
                                     onSelect={() => {
+                                      if (!member.email) return;
                                       const selectedValues = field.value || [];
-                                      const isSelected = selectedValues.includes(member.id);
+                                      const isSelected = selectedValues.includes(member.email);
                                       form.setValue(
                                           'sharedWith',
                                           isSelected
-                                          ? selectedValues.filter(id => id !== member.id)
-                                          : [...selectedValues, member.id]
+                                          ? selectedValues.filter(email => email !== member.email)
+                                          : [...selectedValues, member.email]
                                       );
                                     }}
                                 >
                                     <Check
                                     className={cn(
                                         'mr-2 h-4 w-4',
-                                        field.value?.includes(member.id) ? 'opacity-100' : 'opacity-0'
+                                        field.value?.includes(member.email || '') ? 'opacity-100' : 'opacity-0'
                                     )}
                                     />
                                     {member.name}
+                                    {member.status === 'local' && <span className="text-xs text-muted-foreground ml-auto">(Local, no email)</span>}
                                     {member.status === 'pending' && <span className="text-xs text-muted-foreground ml-auto">(Pending)</span>}
-                                    {member.status === 'local' && <span className="text-xs text-muted-foreground ml-auto">(Local)</span>}
                                 </CommandItem>
                                 ))}
                             </CommandGroup>
@@ -386,15 +388,15 @@ export function AddPasswordDialog({
                         </PopoverContent>
                     </Popover>
                     <FormDescription>
-                      Select family members to associate this credential with. Only active members will receive a shared copy.
+                      Select members to share with. Only active members with an email will receive a shared copy.
                     </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
-                        {field.value?.map(id => {
-                            const member = familyMembers.find(m => m.id === id);
+                        {field.value?.map(email => {
+                            const member = familyMembers.find(m => m.email === email);
                             return member ? (
-                                <Badge variant="secondary" key={id} className="gap-1.5">
+                                <Badge variant="secondary" key={member.id} className="gap-1.5">
                                     {member.name}
-                                    <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberId => memberId !== id))}
+                                    <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberEmail => memberEmail !== email))}
                                     type="button"
                                     className="rounded-full hover:bg-muted-foreground/20"
                                     >
