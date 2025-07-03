@@ -152,7 +152,7 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
     const sharedWithEmails = credential.sharedWith || [];
     
     if (credential.isShared) {
-        return <Badge variant="outline">Shared with me</Badge>;
+        return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Shared with me</Badge>;
     }
 
     if (sharedWithEmails.length === 0) {
