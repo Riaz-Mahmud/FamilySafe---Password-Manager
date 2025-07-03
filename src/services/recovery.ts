@@ -26,14 +26,21 @@ export type AccountRecoveryOutput = z.infer<typeof AccountRecoveryOutputSchema>;
 
 export async function recoverAccount(input: AccountRecoveryInput): Promise<AccountRecoveryOutput> {
   const { email, secretKey } = input;
-  console.log(`[Recovery] Starting recovery process for: ${email}`);
   
-  if (!isFirebaseAdminInitialized || !adminAuth || !adminDb) {
-    const message = 'Firebase Admin is not configured. This is required for Account Recovery. Please set `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` in your `.env` file. See README.md for details.';
+  if (!isFirebaseAdminInitialized) {
+    const message = 'Security Check Failed: The Firebase Admin credentials for validating your secret key are not configured on the server. Please add `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` to your .env file to enable this feature. See README.md for instructions.';
     console.error(`[Recovery] Failure for ${email}: ${message}`);
     return { success: false, message };
   }
 
+  if (!adminAuth || !adminDb) {
+    const message = 'A server error occurred: Firebase Admin components failed to load even though initialization was reported as successful.';
+    console.error(`[Recovery] Failure for ${email}: ${message}`);
+    return { success: false, message };
+  }
+
+  console.log(`[Recovery] Starting recovery process for: ${email}`);
+  
   try {
     // 1. Get user by email using Firebase Admin SDK
     console.log(`[Recovery] Fetching user record for: ${email}`);
@@ -49,7 +56,7 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     if (!userDoc.exists || !userDoc.data()?.recoveryKeyHash) {
       const reason = !userDoc.exists ? "User document does not exist" : "No recoveryKeyHash found";
       console.error(`[Recovery] Failure for ${email}: ${reason}.`);
-      return { success: false, message: 'No recovery key has been set up for this account.' };
+      return { success: false, message: 'The email or secret key is incorrect. No recovery key has been set up for this account.' };
     }
 
     const storedHash = userDoc.data()?.recoveryKeyHash;
