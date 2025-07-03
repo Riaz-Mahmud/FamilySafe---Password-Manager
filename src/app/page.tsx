@@ -437,12 +437,15 @@ export default function DashboardPage() {
 
   const handleSelectFamilyMember = (memberId: string) => {
     const member = familyMembers.find(m => m.id === memberId);
-    if (!member || member.status === 'local') {
-      toast({
-        title: 'Cannot View Shared List',
-        description: 'You can only view passwords shared with active, non-local members.',
-      });
-      return;
+    if (!member) {
+        return; // Safety check
+    }
+
+    if (member.status === 'pending') {
+        toast({
+            title: 'Invitation Pending',
+            description: 'This member has not yet accepted their invitation.',
+        });
     }
     setSelectedFamilyMemberId(memberId);
     setActiveMenu('All Passwords');
