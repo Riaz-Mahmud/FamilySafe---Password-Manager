@@ -12,6 +12,7 @@ export interface Credential {
   tags: string[];
   expiryMonths?: number;
   safeForTravel?: boolean;
+  isShared?: boolean;
 }
 
 export interface FamilyMember {
@@ -19,6 +20,8 @@ export interface FamilyMember {
   name: string;
   email: string;
   avatar: string; // URL to avatar image
+  status: 'pending' | 'active';
+  uid?: string; // The user ID of the family member after they sign up
 }
 
 export interface AuditLog {

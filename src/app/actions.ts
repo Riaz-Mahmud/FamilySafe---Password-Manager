@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
 import { sendInvitationEmail } from '@/ai/flows/send-invitation-email-flow';
+import { addCredential } from '@/services/firestore';
 
 const SendEmailSchema = z.object({
   emails: z.array(z.string().email()),
@@ -57,6 +58,55 @@ export async function sendInvitationEmailAction(data: z.infer<typeof SendInvitat
     return { 
       success: false, 
       message: 'An unexpected error occurred while sending the invitation. Please check the server logs.' 
+    };
+  }
+}
+
+const ShareCredentialDataSchema = z.object({
+  url: z.string(),
+  username: z.string(),
+  password: z.string(),
+  notes: z.string().optional(),
+  icon: z.string(),
+  tags: z.array(z.string()).optional(),
+});
+
+const ShareCredentialSchema = z.object({
+  fromName: z.string(),
+  toUids: z.array(z.string()),
+  credential: ShareCredentialDataSchema,
+});
+
+export async function shareCredentialAction(data: z.infer<typeof ShareCredentialSchema>) {
+  try {
+    const parsedData = ShareCredentialSchema.safeParse(data);
+    if (!parsedData.success) {
+      console.error('Server Action Validation Error:', parsedData.error.flatten());
+      return { success: false, message: 'Invalid input data for sharing.' };
+    }
+
+    const { fromName, toUids, credential } = parsedData.data;
+
+    for (const toUid of toUids) {
+      // Create a new credential object for the recipient
+      const credentialForRecipient = {
+        ...credential,
+        notes: `Shared by ${fromName}.\n\n${credential.notes || ''}`,
+        sharedWith: [], // A shared credential cannot be re-shared by the recipient
+        isShared: true, // Mark that this credential was shared
+      };
+      
+      // Add the credential to the recipient's account
+      await addCredential(toUid, credentialForRecipient);
+    }
+
+    return { success: true, message: 'Credential shared successfully.' };
+
+  } catch (error: any) {
+    console.error('Error in shareCredentialAction:', error);
+    return { 
+      success: false, 
+      message: 'An unexpected error occurred while sharing the credential. Please check the server logs.' 
     };
   }
 }

@@ -76,7 +76,7 @@ import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { sendInvitationEmailAction } from '@/app/actions';
+import { sendInvitationEmailAction, shareCredentialAction } from '@/app/actions';
 
 
 export default function DashboardPage() {
@@ -178,6 +178,46 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>, originalSharedWith: string[] = []) => {
+      if (!user) return;
+      const newSharedWith = credential.sharedWith || [];
+      const addedMemberIds = newSharedWith.filter(id => !originalSharedWith.includes(id));
+      
+      if (addedMemberIds.length > 0) {
+          const membersToShareWith = familyMembers.filter(fm => 
+              addedMemberIds.includes(fm.id) && fm.status === 'active' && fm.uid
+          );
+
+          if (membersToShareWith.length > 0) {
+              const result = await shareCredentialAction({
+                  fromName: user.displayName || user.email!,
+                  toUids: membersToShareWith.map(m => m.uid!),
+                  credential: {
+                      url: credential.url,
+                      username: credential.username,
+                      password: credential.password,
+                      notes: credential.notes,
+                      icon: credential.icon,
+                      tags: credential.tags,
+                  }
+              });
+
+              if (result.success) {
+                  toast({
+                      title: "Credential Shared",
+                      description: `Successfully shared with ${membersToShareWith.length} member(s).`
+                  });
+              } else {
+                   toast({
+                      title: "Sharing Failed",
+                      description: result.message,
+                      variant: "destructive"
+                  });
+              }
+          }
+      }
+  };
+
   const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>) => {
     if(!user) return;
     try {
@@ -187,6 +227,8 @@ export default function DashboardPage() {
         title: 'Credential Added',
         description: 'The new credential has been saved successfully.',
       });
+      // Handle sharing for new credentials
+      await handleSharing(newCredential);
     } catch (error) {
       console.error("Error adding credential:", error);
       toast({ title: 'Error', description: 'Failed to add credential.', variant: 'destructive' });
@@ -196,6 +238,7 @@ export default function DashboardPage() {
   const handleUpdateCredential = async (updatedCredential: Credential) => {
     if(!user) return;
     try {
+      const originalCredential = credentials.find(c => c.id === updatedCredential.id);
       const { id, ...dataToUpdate } = updatedCredential;
       await updateCredential(user.uid, id, dataToUpdate);
       await addAuditLog(user.uid, 'Update Credential', `Updated credential for ${updatedCredential.url}.`);
@@ -203,6 +246,8 @@ export default function DashboardPage() {
         title: 'Credential Updated',
         description: 'The credential has been updated successfully.',
       });
+       // Handle sharing for updated credentials
+      await handleSharing(updatedCredential, originalCredential?.sharedWith);
     } catch (error) {
       console.error("Error updating credential:", error);
       toast({ title: 'Error', description: 'Failed to update credential.', variant: 'destructive' });
@@ -238,6 +283,7 @@ export default function DashboardPage() {
             name: memberData.name,
             email: memberData.email,
             avatar: `https://placehold.co/40x40.png`,
+            status: 'pending' as const,
         };
         await addFamilyMember(user.uid, memberToAdd);
         await addAuditLog(user.uid, 'Create Family Member', `Added ${memberData.name} to the family group.`);
@@ -390,7 +436,7 @@ export default function DashboardPage() {
       
       // Filter by active menu second, as it's the primary mode
       if (activeMenu === 'My Passwords') {
-        if (credential.sharedWith.length !== 0) return false;
+        if (credential.sharedWith.length !== 0 || credential.isShared) return false;
       }
 
       // Filter by selected family member if a member is selected

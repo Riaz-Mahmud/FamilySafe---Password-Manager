@@ -13,6 +13,7 @@ import {
   orderBy,
   onSnapshot,
   getDocs,
+  where,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '@/lib/crypto';
 
@@ -46,6 +47,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           tags: data.tags || [],
           expiryMonths: data.expiryMonths,
           safeForTravel: data.safeForTravel || false,
+          isShared: data.isShared || false,
         } as Credential;
     });
     callback(credentials);
@@ -68,6 +70,7 @@ export async function addCredential(userId: string, credential: Omit<Credential,
     tags: credential.tags || [],
     expiryMonths: credential.expiryMonths || null,
     safeForTravel: credential.safeForTravel || false,
+    isShared: credential.isShared || false,
     createdAt: serverTimestamp(),
     lastModified: serverTimestamp(),
   };
@@ -112,7 +115,14 @@ export async function deleteCredential(userId: string, id: string): Promise<void
 export function getFamilyMembers(userId: string, callback: (familyMembers: FamilyMember[]) => void): () => void {
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   const unsubscribe = onSnapshot(familyMembersCol, (snapshot) => {
-    const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyMember));
+    const members = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+            id: doc.id,
+            ...data,
+            status: data.status || 'pending',
+        } as FamilyMember
+    });
     callback(members);
   }, (error) => {
     console.error("Error fetching family members:", error);
@@ -248,6 +258,23 @@ export function getReferralCount(userId: string, callback: (count: number) => vo
     callback(0);
   });
   return unsubscribe;
+}
+
+export async function activateFamilyMember(referrerId: string, referredUid: string, referredEmail: string): Promise<void> {
+    const familyMembersCol = collection(db, 'users', referrerId, 'familyMembers');
+    const q = query(familyMembersCol, where("email", "==", referredEmail), where("status", "==", "pending"));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        const familyMemberDoc = querySnapshot.docs[0];
+        await updateDoc(familyMemberDoc.ref, {
+            status: 'active',
+            uid: referredUid,
+        });
+        console.log(`Activated family member ${referredEmail} for referrer ${referrerId}`);
+    } else {
+        console.log(`No pending family member found for email ${referredEmail} for referrer ${referrerId}`);
+    }
 }
 
 

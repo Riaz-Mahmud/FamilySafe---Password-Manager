@@ -154,6 +154,8 @@ export function AddPasswordDialog({
     onOpenChange(false);
   }
 
+  const activeFamilyMembers = familyMembers.filter(m => m.status === 'active');
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
@@ -352,9 +354,9 @@ export function AddPasswordDialog({
                         <Command>
                             <CommandInput placeholder="Search members..." />
                             <CommandList>
-                            <CommandEmpty>No members found.</CommandEmpty>
+                            <CommandEmpty>No active members found.</CommandEmpty>
                             <CommandGroup>
-                                {familyMembers.map(member => (
+                                {activeFamilyMembers.map(member => (
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
@@ -383,9 +385,12 @@ export function AddPasswordDialog({
                         </Command>
                         </PopoverContent>
                     </Popover>
+                    <FormDescription>
+                      Only family members who have accepted their invitation will appear here.
+                    </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
                         {field.value?.map(id => {
-                            const member = familyMembers.find(m => m.id === id);
+                            const member = activeFamilyMembers.find(m => m.id === id);
                             return member ? (
                                 <Badge variant="secondary" key={id} className="gap-1.5">
                                     {member.name}

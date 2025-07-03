@@ -5,7 +5,8 @@ import type { FamilyMember } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Edit, Trash2, Users } from 'lucide-react';
+import { Edit, Trash2, Users, CheckCircle, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 type FamilyMembersListProps = {
   familyMembers: FamilyMember[];
@@ -42,7 +43,17 @@ export function FamilyMembersList({ familyMembers, onEdit, onDelete, onMemberSel
               </Avatar>
               <h3 className="font-semibold text-lg">{member.name}</h3>
               <p className="text-sm text-muted-foreground">{member.email}</p>
-              <p className="text-sm text-muted-foreground">Member</p>
+               {member.status === 'active' ? (
+                  <Badge variant="secondary" className="mt-2 text-green-600 border-green-600/50">
+                    <CheckCircle className="mr-1 h-3 w-3" />
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="mt-2">
+                    <Clock className="mr-1 h-3 w-3" />
+                    Pending
+                  </Badge>
+                )}
             </div>
             <div className="flex gap-2 w-full p-6 pt-2 border-t mt-auto">
                 <Button variant="outline" size="sm" className="w-full" onClick={() => onEdit(member)}>

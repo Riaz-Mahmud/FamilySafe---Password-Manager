@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { signUp } from '@/services/auth';
-import { addAuditLog, recordReferral } from '@/services/firestore';
+import { addAuditLog, recordReferral, activateFamilyMember } from '@/services/firestore';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
 
@@ -55,8 +55,9 @@ export default function SignupPage() {
       await addAuditLog(newUser.uid, 'Account Created', 'User created a new account.');
       
       const referrerId = localStorage.getItem('referralCode');
-      if (referrerId) {
+      if (referrerId && newUser.email) {
         await recordReferral(referrerId, newUser.uid);
+        await activateFamilyMember(referrerId, newUser.uid, newUser.email);
         localStorage.removeItem('referralCode');
       }
 
