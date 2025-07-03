@@ -26,10 +26,12 @@ export function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [referralLink, setReferralLink] = useState('');
   const [referralCount, setReferralCount] = useState(0);
+
+  // Recovery Kit State
   const [isRecoveryKitOpen, setRecoveryKitOpen] = useState(false);
+  const [showRecoveryInfoDialog, setShowRecoveryInfoDialog] = useState(false);
   const [hasRecoveryKey, setHasRecoveryKey] = useState(false);
   const [isCheckingKey, setIsCheckingKey] = useState(true);
-  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [newlyGeneratedKey, setNewlyGeneratedKey] = useState('');
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
 
@@ -183,14 +185,6 @@ export function SettingsPage() {
     }
   };
 
-  const handleRecoveryClick = () => {
-    if (hasRecoveryKey) {
-      setShowRegenerateConfirm(true);
-    } else {
-      handleGenerateKeyAndOpenDialog();
-    }
-  };
-
   return (
     <>
     <div className="space-y-6">
@@ -262,14 +256,11 @@ export function SettingsPage() {
            <div className="space-y-2">
             <h3 className="font-medium">Account Recovery</h3>
             <p className="text-sm text-muted-foreground">
-              {hasRecoveryKey 
-                ? "Generate a new recovery kit. This will invalidate your old one."
-                : "Generate a printable recovery kit in case you lose access to your account."
-              }
+              Generate a printable recovery kit in case you lose access to your account.
             </p>
-             <Button variant="outline" onClick={handleRecoveryClick} disabled={isCheckingKey || isGeneratingKey}>
+             <Button variant="outline" onClick={() => setShowRecoveryInfoDialog(true)} disabled={isCheckingKey || isGeneratingKey}>
               {(isCheckingKey || isGeneratingKey) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {hasRecoveryKey ? 'Generate New Recovery Kit' : 'Generate Recovery Kit'}
+              Show Recovery Kit
             </Button>
           </div>
         </CardContent>
@@ -322,23 +313,26 @@ export function SettingsPage() {
       </Card>
     </div>
 
-    <AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
+    <AlertDialog open={showRecoveryInfoDialog} onOpenChange={setShowRecoveryInfoDialog}>
         <AlertDialogContent>
             <AlertDialogHeader>
-                <AlertDialogTitle>Generate a New Recovery Kit?</AlertDialogTitle>
+                <AlertDialogTitle>
+                    {hasRecoveryKey ? 'Manage Your Recovery Kit' : 'Generate a Recovery Kit'}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                    You already have a recovery kit. Generating a new one will
-                    invalidate your old kit, making it useless for account recovery.
-                    Are you sure you want to proceed?
+                    {hasRecoveryKey 
+                    ? "For your security, your secret key can't be shown again. If you've lost your kit, you can generate a new one which will invalidate your old one forever."
+                    : "You don't have a recovery kit yet. Generate one now to protect your account. Store it in a safe, offline place."
+                    }
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={() => {
-                    setShowRegenerateConfirm(false);
+                    setShowRecoveryInfoDialog(false);
                     handleGenerateKeyAndOpenDialog();
                 }}>
-                    Yes, Generate New Kit
+                    {hasRecoveryKey ? 'Generate New Kit' : 'Generate and Save Kit'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
