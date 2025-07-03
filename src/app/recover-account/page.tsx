@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ShieldQuestion } from 'lucide-react';
+import { sendPasswordReset } from '@/services/auth';
 
 export default function RecoverAccountPage() {
   const [email, setEmail] = useState('');
@@ -20,17 +21,28 @@ export default function RecoverAccountPage() {
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // In a real application, you would add logic here to:
-    // 1. Validate the email and secret key against a secure backend service.
-    // 2. If valid, initiate a password reset flow.
-    // For this prototype, we'll just simulate a success message.
-    setTimeout(() => {
-        toast({
-            title: 'Recovery Information Submitted',
-            description: 'If your details are correct, you will receive an email with instructions to reset your password.',
-        });
-        setIsLoading(false);
-    }, 1500);
+    // In a full implementation, the secretKey would be validated against a stored key
+    // on the backend before sending the reset email. For this prototype, we will proceed 
+    // with sending the email directly if the form is submitted.
+    try {
+      // For security, we don't want to reveal if an email is registered or not.
+      // We'll send the reset email and show a generic message regardless of whether
+      // the user was found. The backend handles the actual existence check.
+      await sendPasswordReset(email);
+      toast({
+        title: 'Check Your Email',
+        description: 'If an account exists for this email, you will receive a password reset link.',
+      });
+    } catch (error: any) {
+      console.error("Password reset attempt error:", error);
+      // We still show a generic message to the user to prevent email enumeration attacks.
+      toast({
+        title: 'Check Your Email',
+        description: 'If an account exists for this email, you will receive a password reset link.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
