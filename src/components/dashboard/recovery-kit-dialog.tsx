@@ -17,7 +17,6 @@ import type { User } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
 import { AlertTriangle, Copy, Printer, ShieldCheck, Loader2 } from 'lucide-react';
 import { saveRecoveryKeyHash } from '@/services/firestore';
-import { useAuth } from '@/context/auth-provider';
 
 type RecoveryKitDialogProps = {
   open: boolean;
@@ -37,7 +36,7 @@ export function RecoveryKitDialog({
   useEffect(() => {
     if (open && user) {
       setIsSavingKey(true);
-      // Generate a new key each time the dialog is opened for security.
+      // Generate a new key each time the dialog is opened. This new key will invalidate any old one.
       const newSecretKey = crypto.randomUUID();
       setSecretKey(newSecretKey);
       
@@ -53,9 +52,10 @@ export function RecoveryKitDialog({
             description: 'Could not prepare recovery kit. Please try again.',
             variant: 'destructive',
           });
+          onOpenChange(false); // Close dialog on error
         });
     }
-  }, [open, user, toast]);
+  }, [open, user, toast, onOpenChange]);
 
   const handlePrint = () => {
     window.print();
@@ -105,18 +105,18 @@ export function RecoveryKitDialog({
             <DialogHeader className="text-left">
               <DialogTitle className="font-headline flex items-center gap-2">
                 <ShieldCheck className="h-7 w-7 text-primary" />
-                FamilySafe Recovery Kit
+                Your New FamilySafe Recovery Kit
               </DialogTitle>
               <DialogDescription>
-                Print this kit and store it in a safe physical location, such as a safe deposit box.
+                This new kit replaces any previous one you may have saved. Print this and store it in a safe place.
               </DialogDescription>
             </DialogHeader>
             
             <div className="p-4 bg-destructive/10 border border-destructive/50 text-destructive rounded-lg flex items-start gap-3">
               <AlertTriangle className="h-6 w-6 mt-1 flex-shrink-0" />
               <div>
-                <h3 className="font-bold">Important: Do Not Lose This Kit</h3>
-                <p className="text-sm">This is the only way to recover your account if you forget your master password. Do not save this as a digital file on your computer. Keep it offline and secure.</p>
+                <h3 className="font-bold">Important: Your Old Kit Is Now Invalid</h3>
+                <p className="text-sm">This is now the only secret key that can be used to recover your account. Your old kit, if you had one, is now useless. Do not save this as a digital file on your computer. Keep it offline and secure.</p>
               </div>
             </div>
 
@@ -127,7 +127,7 @@ export function RecoveryKitDialog({
               </div>
               
               <div>
-                 <h4 className="font-semibold">Secret Recovery Key</h4>
+                 <h4 className="font-semibold">Your New Secret Recovery Key</h4>
                  <div className="flex items-center gap-2 mt-1">
                     <p className="text-muted-foreground font-mono p-2 bg-secondary rounded-md text-sm w-full break-all">
                       {isSavingKey ? 'Generating...' : secretKey}

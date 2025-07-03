@@ -1,6 +1,7 @@
 
 
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
 import {
@@ -113,8 +114,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const credentialsFromDb = snapshot.docs.map(doc => {
         const data = doc.data();
-        // Shared items are encrypted with the recipient's key, not the owner's.
-        // The current user (userId) is always the recipient.
+        // The current user (userId) is always the key for decryption.
         const key = userId;
         return {
           id: doc.id,
@@ -689,4 +689,15 @@ export async function saveRecoveryKeyHash(userId: string, secretKey: string): Pr
   const keyHash = sha256(secretKey);
   // Use set with merge to create the doc if it doesn't exist, or update if it does.
   await setDoc(userDocRef, { recoveryKeyHash: keyHash }, { merge: true });
+}
+
+export async function checkRecoveryKeyExists(userId: string): Promise<boolean> {
+  const userDocRef = doc(db, 'users', userId);
+  try {
+    const userDoc = await getDoc(userDocRef);
+    return userDoc.exists() && !!userDoc.data()?.recoveryKeyHash;
+  } catch (error) {
+    console.error("Error checking for recovery key:", error);
+    return false;
+  }
 }

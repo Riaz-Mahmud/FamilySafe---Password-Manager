@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { updateUserProfile, sendPasswordReset, deleteCurrentUser } from '@/services/auth';
-import { getUserDataForExport, getReferralCount, deleteUserData } from '@/services/firestore';
+import { getUserDataForExport, getReferralCount, deleteUserData, checkRecoveryKeyExists } from '@/services/firestore';
 import { Loader2, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,9 @@ export function SettingsPage() {
   const [referralLink, setReferralLink] = useState('');
   const [referralCount, setReferralCount] = useState(0);
   const [isRecoveryKitOpen, setRecoveryKitOpen] = useState(false);
-
+  const [hasRecoveryKey, setHasRecoveryKey] = useState(false);
+  const [isCheckingKey, setIsCheckingKey] = useState(true);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -39,6 +41,12 @@ export function SettingsPage() {
         setReferralCount(count);
       });
       
+      setIsCheckingKey(true);
+      checkRecoveryKeyExists(user.uid).then(exists => {
+        setHasRecoveryKey(exists);
+        setIsCheckingKey(false);
+      });
+
       return () => unsubscribe();
     }
   }, [user]);
@@ -152,6 +160,13 @@ export function SettingsPage() {
     }
   };
 
+  const handleRecoveryClick = () => {
+    if (hasRecoveryKey) {
+      setShowRegenerateConfirm(true);
+    } else {
+      setRecoveryKitOpen(true);
+    }
+  };
 
   return (
     <>
@@ -224,10 +239,14 @@ export function SettingsPage() {
            <div className="space-y-2">
             <h3 className="font-medium">Account Recovery</h3>
             <p className="text-sm text-muted-foreground">
-              Generate a printable recovery kit in case you lose access to your account.
+              {hasRecoveryKey 
+                ? "Generate a new recovery kit. This will invalidate your old one."
+                : "Generate a printable recovery kit in case you lose access to your account."
+              }
             </p>
-             <Button variant="outline" onClick={() => setRecoveryKitOpen(true)}>
-              Generate Recovery Kit
+             <Button variant="outline" onClick={handleRecoveryClick} disabled={isCheckingKey}>
+              {isCheckingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {hasRecoveryKey ? 'Generate New Recovery Kit' : 'Generate Recovery Kit'}
             </Button>
           </div>
         </CardContent>
@@ -279,6 +298,29 @@ export function SettingsPage() {
         </CardContent>
       </Card>
     </div>
+
+    <AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Generate a New Recovery Kit?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    You already have a recovery kit. Generating a new one will
+                    invalidate your old kit, making it useless for account recovery.
+                    Are you sure you want to proceed?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => {
+                    setShowRegenerateConfirm(false);
+                    setRecoveryKitOpen(true);
+                }}>
+                    Yes, Generate New Kit
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    
     <RecoveryKitDialog
         open={isRecoveryKitOpen}
         onOpenChange={setRecoveryKitOpen}
