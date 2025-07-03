@@ -6,7 +6,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { updateSessionLastSeen } from '@/services/firestore';
+import { updateSessionLastSeen, findAndActivateByEmail } from '@/services/firestore';
 
 type AuthContextType = {
   user: User | null;
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let unsubscribeSession: () => void;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
 
@@ -31,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (user) {
+        // When a user signs in, check if they have any pending invitations to activate their account.
+        if (user.email) {
+          await findAndActivateByEmail(user.uid, user.email);
+        }
+
         const sessionId = localStorage.getItem('sessionId');
         if (sessionId) {
           updateSessionLastSeen(user.uid, sessionId);

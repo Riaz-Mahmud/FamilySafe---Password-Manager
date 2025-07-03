@@ -9,6 +9,7 @@ import {
   updateProfile,
   type User,
   deleteUser,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { addDeviceSession, revokeDeviceSession } from './firestore';
@@ -62,4 +63,15 @@ export async function deleteCurrentUser(): Promise<void> {
         throw new Error('No user is currently signed in to be deleted.');
     }
     await deleteUser(user);
+}
+
+export async function checkIfEmailExists(email: string): Promise<boolean> {
+    try {
+        const methods = await fetchSignInMethodsForEmail(auth, email);
+        return methods.length > 0;
+    } catch (error) {
+        console.error("Error checking email existence:", error);
+        // Default to false on error to avoid blocking the user flow.
+        return false;
+    }
 }

@@ -136,15 +136,14 @@ export async function addFamilyMember(userId: string, member: Omit<FamilyMember,
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   const familyMemberDocRef = await addDoc(familyMembersCol, member);
 
-  // If they are pending, add to the global invitations collection for lookup on signup
-  if (member.status === 'pending') {
-    const invitationsCol = collection(db, 'invitations');
-    await addDoc(invitationsCol, {
-      referrerId: userId,
-      inviteeEmail: member.email,
-      familyMemberDocId: familyMemberDocRef.id,
-    });
-  }
+  // ALWAYS add to the global invitations collection for lookup on signup/login.
+  // This allows us to link accounts even if an invitation email isn't sent.
+  const invitationsCol = collection(db, 'invitations');
+  await addDoc(invitationsCol, {
+    referrerId: userId,
+    inviteeEmail: member.email,
+    familyMemberDocId: familyMemberDocRef.id,
+  });
 }
 
 export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {

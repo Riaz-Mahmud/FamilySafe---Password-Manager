@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -25,6 +26,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FamilyMember } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useDebounce } from '@/hooks/use-debounce';
+import { checkIfEmailExists } from '@/services/auth';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   name: z.string().min(1, { message: 'Name is required.' }),
@@ -57,6 +61,32 @@ export function AddFamilyMemberDialog({
       sendInvite: true,
     },
   });
+  
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [emailExists, setEmailExists] = useState<boolean | null>(null);
+
+  const emailValue = form.watch('email');
+  const debouncedEmail = useDebounce(emailValue, 500);
+
+  useEffect(() => {
+    // Only check if it's a valid email format to avoid unnecessary API calls
+    const emailCheck = z.string().email().safeParse(debouncedEmail);
+    if (emailCheck.success && !isEditing) {
+      setIsCheckingEmail(true);
+      setEmailExists(null);
+      checkIfEmailExists(emailCheck.data).then(exists => {
+        setEmailExists(exists);
+        if (exists) {
+          // If email exists, automatically uncheck "send invite" as it's not needed.
+          form.setValue('sendInvite', false);
+        }
+        setIsCheckingEmail(false);
+      });
+    } else {
+      setEmailExists(null);
+    }
+  }, [debouncedEmail, form, isEditing]);
+
 
   useEffect(() => {
     if (open) {
@@ -73,6 +103,7 @@ export function AddFamilyMemberDialog({
           sendInvite: true,
         });
       }
+      setEmailExists(null);
     }
   }, [open, familyMemberToEdit, form]);
 
@@ -138,14 +169,18 @@ export function AddFamilyMemberDialog({
                       <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={isCheckingEmail || emailExists === true}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>
+                      <FormLabel className="flex items-center">
                         Send invitation email
+                        {isCheckingEmail && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
                       </FormLabel>
                       <FormDescription>
-                        An email will be sent to this address with a link to sign up.
+                        {emailExists
+                            ? "This user already has an account. No invitation is needed."
+                            : "An email will be sent with a link to sign up."}
                       </FormDescription>
                     </div>
                   </FormItem>

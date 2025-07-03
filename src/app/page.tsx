@@ -283,8 +283,9 @@ export default function DashboardPage() {
             name: memberData.name,
             email: memberData.email,
             avatar: `https://placehold.co/40x40.png`,
-            status: memberData.sendInvite ? 'pending' : 'active' as const,
+            status: 'pending' as const, // Always 'pending' until the account is linked.
         };
+        
         await addFamilyMember(user.uid, memberToAdd);
         await addAuditLog(user.uid, 'Create Family Member', `Added ${memberData.name} to the family group.`);
 
@@ -292,13 +293,13 @@ export default function DashboardPage() {
             const result = await sendInvitationEmailAction({
                 email: memberData.email,
                 referrerName: user.displayName || 'A friend',
-                referralLink: `${window.location.origin}/signup?ref=${user.uid}`,
+                referralLink: `${window.location.origin}/signup`,
             });
 
             if (result.success) {
                 toast({
-                    title: 'Family Member Added & Invited',
-                    description: `${memberData.name} has been added and an invitation email has been sent.`,
+                    title: 'Family Member Invited',
+                    description: `An invitation has been sent to ${memberData.name}. Their status will become active once they sign up.`,
                 });
             } else {
                 toast({
@@ -311,7 +312,7 @@ export default function DashboardPage() {
         } else {
             toast({
                 title: 'Family Member Added',
-                description: `${memberData.name} has been added to your family group as an active member.`,
+                description: `${memberData.name} has been added. Their account will be linked automatically when they next sign in.`,
             });
         }
     } catch (error) {
