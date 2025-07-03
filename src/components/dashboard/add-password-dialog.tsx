@@ -358,23 +358,21 @@ export function AddPasswordDialog({
                                 <CommandItem
                                     value={member.name}
                                     key={member.id}
-                                    disabled={!member.email}
                                     onSelect={() => {
-                                      if (!member.email) return;
                                       const selectedValues = field.value || [];
-                                      const isSelected = selectedValues.includes(member.email);
+                                      const isSelected = selectedValues.includes(member.id);
                                       form.setValue(
                                           'sharedWith',
                                           isSelected
-                                          ? selectedValues.filter(email => email !== member.email)
-                                          : [...selectedValues, member.email]
+                                          ? selectedValues.filter(id => id !== member.id)
+                                          : [...selectedValues, member.id]
                                       );
                                     }}
                                 >
                                     <Check
                                     className={cn(
                                         'mr-2 h-4 w-4',
-                                        field.value?.includes(member.email || '') ? 'opacity-100' : 'opacity-0'
+                                        field.value?.includes(member.id || '') ? 'opacity-100' : 'opacity-0'
                                     )}
                                     />
                                     {member.name}
@@ -388,15 +386,15 @@ export function AddPasswordDialog({
                         </PopoverContent>
                     </Popover>
                     <FormDescription>
-                      Select members to share with. Only active members with an email will receive a shared copy.
+                      Select members to associate this credential with. An active shared copy will only be sent to members with an account.
                     </FormDescription>
                     <div className="pt-2 flex flex-wrap gap-2">
-                        {field.value?.map(email => {
-                            const member = familyMembers.find(m => m.email === email);
+                        {field.value?.map(id => {
+                            const member = familyMembers.find(m => m.id === id);
                             return member ? (
                                 <Badge variant="secondary" key={member.id} className="gap-1.5">
                                     {member.name}
-                                    <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberEmail => memberEmail !== email))}
+                                    <button onClick={() => form.setValue('sharedWith', form.getValues('sharedWith')?.filter(memberId => memberId !== id))}
                                     type="button"
                                     className="rounded-full hover:bg-muted-foreground/20"
                                     >

@@ -96,10 +96,12 @@ export function SendEmailDialog({
   })();
 
   const sharedWithMembers = familyMembers.filter((member) =>
-    credential.sharedWith.includes(member.id)
+    credential.sharedWith.includes(member.id) && member.email
   );
   
-  const allPossibleRecipients = (user?.email ? [user.email] : []).concat(sharedWithMembers.map(m => m.email));
+  const allPossibleRecipients = (user?.email ? [{email: user.email, name: 'You', id: user.uid}] : []).concat(
+    sharedWithMembers
+  );
 
 
   return (
@@ -117,33 +119,21 @@ export function SendEmailDialog({
             <h4 className="font-medium text-sm">Recipients</h4>
             {allPossibleRecipients.length > 0 ? (
                 <>
-                {user?.email && (
-                <div className="flex items-center space-x-2">
+                {allPossibleRecipients.map((recipient) => (
+                   <div key={recipient.id} className="flex items-center space-x-2">
                     <Checkbox
-                    id={user.email}
-                    onCheckedChange={(checked) => handleEmailSelection(user.email!, !!checked)}
-                    checked={selectedEmails.includes(user.email)}
+                    id={recipient.id}
+                    onCheckedChange={(checked) => handleEmailSelection(recipient.email!, !!checked)}
+                    checked={selectedEmails.includes(recipient.email!)}
                     />
-                    <Label htmlFor={user.email} className="font-normal">
-                    {user.email} (You)
-                    </Label>
-                </div>
-                )}
-                {sharedWithMembers.map((member) => (
-                <div key={member.id} className="flex items-center space-x-2">
-                    <Checkbox
-                    id={member.id}
-                    onCheckedChange={(checked) => handleEmailSelection(member.email, !!checked)}
-                    checked={selectedEmails.includes(member.email)}
-                    />
-                    <Label htmlFor={member.id} className="font-normal">
-                    {member.email} ({member.name})
+                    <Label htmlFor={recipient.id} className="font-normal">
+                    {recipient.email} ({recipient.name})
                     </Label>
                 </div>
                 ))}
             </>
             ) : (
-                <p className="text-sm text-muted-foreground">No recipients available. Share this password with a family member to be able to email them.</p>
+                <p className="text-sm text-muted-foreground">No recipients available. Share this password with a family member (with an email) to be able to email them.</p>
             )}
             
           </div>

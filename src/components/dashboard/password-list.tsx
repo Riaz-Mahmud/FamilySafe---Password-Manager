@@ -141,19 +141,19 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
   }
 
   const renderSharedWith = (credential: Credential) => {
-    const sharedWithEmails = credential.sharedWith || [];
+    const sharedWithIds = credential.sharedWith || [];
 
     if (credential.isShared) {
         const sharedByNote = credential.notes?.split('\n\n')[0] || 'Shared by someone';
         return <Badge variant="outline">{sharedByNote}</Badge>;
     }
 
-    if (sharedWithEmails.length === 0) {
+    if (sharedWithIds.length === 0) {
         return <Badge variant="outline">Only You</Badge>;
     }
 
     const sharedWithMembers = familyMembers.filter(member =>
-      sharedWithEmails.includes(member.email || '')
+      sharedWithIds.includes(member.id)
     );
     
     if (sharedWithMembers.length > 0) {
@@ -224,11 +224,11 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => onEdit(credential)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
+                                    <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onSend(credential)}>
+                                    <DropdownMenuItem onClick={() => onSend(credential)} disabled={credential.isShared}>
                                       <Mail className="mr-2 h-4 w-4" />
                                       Send Email
                                     </DropdownMenuItem>
@@ -356,11 +356,11 @@ export function PasswordList({ credentials, familyMembers, onEdit, onDelete, onS
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => onEdit(credential)}>
+                            <DropdownMenuItem onClick={() => onEdit(credential)} disabled={credential.isShared}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onSend(credential)}>
+                            <DropdownMenuItem onClick={() => onSend(credential)} disabled={credential.isShared}>
                               <Mail className="mr-2 h-4 w-4" />
                               Send Email
                             </DropdownMenuItem>

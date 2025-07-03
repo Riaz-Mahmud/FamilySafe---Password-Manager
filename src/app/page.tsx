@@ -225,18 +225,18 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
-  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>, originalSharedWith: string[] = []) => {
+  const handleSharing = async (credential: Omit<Credential, 'id' | 'lastModified' | 'createdAt'>, originalSharedWithIds: string[] = []) => {
       if (!user) return;
       
-      const newSharedWithEmails = credential.sharedWith || [];
-      const addedEmails = newSharedWithEmails.filter(email => !originalSharedWith.includes(email));
+      const newSharedWithIds = credential.sharedWith || [];
+      const addedIds = newSharedWithIds.filter(id => !originalSharedWithIds.includes(id));
       
-      // Filter for members who actually have an email to share to
-      const membersToShareWith = familyMembers.filter(fm => 
-          addedEmails.includes(fm.email || '') && fm.email
+      // From those members, filter out the ones that are not local and have an email
+      const sharableMembers = familyMembers.filter(m => 
+          addedIds.includes(m.id) && m.email && m.status !== 'local'
       );
 
-      const emailsToShareWith = membersToShareWith.map(m => m.email!);
+      const emailsToShareWith = sharableMembers.map(m => m.email!);
 
       if (emailsToShareWith.length > 0) {
           const result = await shareCredentialAction({
@@ -526,8 +526,9 @@ export default function DashboardPage() {
       // Filter by selected family member if a member is selected
       if (selectedFamilyMemberId) {
         const member = familyMembers.find(m => m.id === selectedFamilyMemberId);
-        if (!member || !member.email) return false;
-        if (!credential.sharedWith.includes(member.email)) {
+        if (!member) return false; // Safety check
+        // Check if the credential's sharedWith array contains the selected member's ID
+        if (!credential.sharedWith.includes(selectedFamilyMemberId)) {
           return false;
         }
       }
