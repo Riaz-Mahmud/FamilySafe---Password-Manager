@@ -15,6 +15,7 @@ import {
   getDocs,
   getDoc,
   where,
+  limit,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '@/lib/crypto';
 
@@ -100,6 +101,9 @@ export async function updateCredential(userId: string, id: string, credential: P
   if (credential.hasOwnProperty('safeForTravel')) {
     encryptedUpdate.safeForTravel = credential.safeForTravel || false;
   }
+  if (credential.hasOwnProperty('isShared')) {
+    encryptedUpdate.isShared = credential.isShared || false;
+  }
   if (credential.hasOwnProperty('sharedTo')) {
     encryptedUpdate.sharedTo = credential.sharedTo || null;
   }
@@ -127,6 +131,7 @@ export function getFamilyMembers(userId: string, callback: (familyMembers: Famil
             id: doc.id,
             ...data,
             status: data.status || 'pending',
+            email: data.email || undefined,
         } as FamilyMember
     });
     callback(members);
@@ -141,8 +146,15 @@ export async function addFamilyMember(userId: string, member: Omit<FamilyMember,
   const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
   
   // Firestore does not allow `undefined` values. Create a clean object.
-  const { email, ...restOfMember } = member;
-  const dataToAdd = email ? member : restOfMember;
+  const dataToAdd: { name: string; status: 'pending' | 'active' | 'local'; avatar: string; email?: string } = {
+    name: member.name,
+    status: member.status,
+    avatar: member.avatar,
+  };
+
+  if (member.email) {
+    dataToAdd.email = member.email;
+  }
 
   const familyMemberDocRef = await addDoc(familyMembersCol, dataToAdd);
 
@@ -159,7 +171,11 @@ export async function addFamilyMember(userId: string, member: Omit<FamilyMember,
 
 export async function updateFamilyMember(userId: string, id: string, member: Partial<FamilyMember>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'familyMembers', id);
-  await updateDoc(docRef, member);
+  const dataToUpdate = { ...member };
+  if (dataToUpdate.email === '') {
+      delete dataToUpdate.email;
+  }
+  await updateDoc(docRef, dataToUpdate);
 }
 
 export async function deleteFamilyMember(userId: string, id: string): Promise<void> {
@@ -226,12 +242,27 @@ export function getAuditLogs(userId: string, callback: (logs: AuditLog[]) => voi
 
 export async function addDeviceSession(userId: string, userAgent: string): Promise<string> {
   const sessionsCol = collection(db, 'users', userId, 'sessions');
-  const docRef = await addDoc(sessionsCol, {
-    userAgent,
-    createdAt: serverTimestamp(),
-    lastSeen: serverTimestamp(),
-  });
-  return docRef.id;
+  
+  // Check if a session for this device (user agent) already exists.
+  const q = query(sessionsCol, where('userAgent', '==', userAgent), limit(1));
+  const querySnapshot = await getDocs(q);
+
+  if (!querySnapshot.empty) {
+    // If it exists, update the lastSeen timestamp and return the existing session ID.
+    const existingSession = querySnapshot.docs[0];
+    await updateDoc(existingSession.ref, {
+      lastSeen: serverTimestamp(),
+    });
+    return existingSession.id;
+  } else {
+    // If it doesn't exist, create a new session document.
+    const docRef = await addDoc(sessionsCol, {
+      userAgent,
+      createdAt: serverTimestamp(),
+      lastSeen: serverTimestamp(),
+    });
+    return docRef.id;
+  }
 }
 
 export async function updateSessionLastSeen(userId: string, sessionId: string): Promise<void> {
