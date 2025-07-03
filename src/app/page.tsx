@@ -186,7 +186,7 @@ export default function DashboardPage() {
       
       if (addedMemberIds.length > 0) {
           const membersToShareWith = familyMembers.filter(fm => 
-              addedMemberIds.includes(fm.id) && fm.status === 'active' && fm.uid
+              addedMemberIds.includes(fm.id) && fm.uid
           );
 
           if (membersToShareWith.length > 0) {
