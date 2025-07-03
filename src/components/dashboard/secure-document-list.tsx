@@ -26,6 +26,7 @@ import { MoreHorizontal, Trash2, Edit, Download, File as FileIcon, FileText as F
 import type { SecureDocument } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
+import Image from 'next/image';
 
 type SecureDocumentListProps = {
   documents: SecureDocument[];
@@ -84,14 +85,25 @@ export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocume
       <div className="md:hidden space-y-4">
         {currentDocuments.map(doc => {
             const IconComponent = iconMap[doc.icon] || FileIcon;
+            const isImage = doc.icon === 'ImageIcon';
             return (
                 <Card key={doc.id} className="w-full">
                     <CardContent className="p-4 flex flex-col gap-4">
                         <div className="flex items-start justify-between gap-4">
                             <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
-                                    <IconComponent className="w-5 h-5 text-muted-foreground" />
-                                </div>
+                                {isImage ? (
+                                    <Image
+                                        src={doc.fileDataUrl}
+                                        alt={doc.name}
+                                        width={40}
+                                        height={40}
+                                        className="h-10 w-10 rounded-lg object-cover shrink-0"
+                                    />
+                                ) : (
+                                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
+                                        <IconComponent className="w-5 h-5 text-muted-foreground" />
+                                    </div>
+                                )}
                                 <div className="flex flex-col overflow-hidden">
                                     <p className="font-medium truncate">{doc.name}</p>
                                     <p className="text-sm text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
@@ -148,13 +160,24 @@ export function SecureDocumentList({ documents, onEdit, onDelete }: SecureDocume
           <TableBody>
             {currentDocuments.map(doc => {
               const IconComponent = iconMap[doc.icon] || FileIcon;
+              const isImage = doc.icon === 'ImageIcon';
               return (
                 <TableRow key={doc.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
-                        <IconComponent className="w-5 h-5 text-muted-foreground" />
-                      </div>
+                      {isImage ? (
+                          <Image
+                              src={doc.fileDataUrl}
+                              alt={doc.name}
+                              width={40}
+                              height={40}
+                              className="h-10 w-10 rounded-lg object-cover shrink-0"
+                          />
+                      ) : (
+                        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
+                          <IconComponent className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
                       <div className="flex flex-col overflow-hidden">
                         <span className="font-medium truncate">{doc.name}</span>
                         <span className="text-sm text-muted-foreground">{doc.fileType}</span>
