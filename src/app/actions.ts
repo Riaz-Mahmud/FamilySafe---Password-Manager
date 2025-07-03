@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
 import { sendInvitationEmail } from '@/ai/flows/send-invitation-email-flow';
-import { addCredential } from '@/services/firestore';
+import { createShare } from '@/services/firestore';
 
 const SendEmailSchema = z.object({
   emails: z.array(z.string().email()),
@@ -62,24 +62,20 @@ export async function sendInvitationEmailAction(data: z.infer<typeof SendInvitat
   }
 }
 
-const ShareCredentialRecipientSchema = z.object({
-  uid: z.string(),
-  email: z.string().email(),
-});
-
-const ShareCredentialDataSchema = z.object({
-  url: z.string(),
-  username: z.string(),
-  password: z.string(),
-  notes: z.string().optional(),
-  icon: z.string(),
-  tags: z.array(z.string()).optional(),
-});
-
 const ShareCredentialSchema = z.object({
+  fromUid: z.string(),
   fromName: z.string(),
-  toRecipients: z.array(ShareCredentialRecipientSchema),
-  credential: ShareCredentialDataSchema,
+  toEmails: z.array(z.string().email()),
+  credential: z.object({
+    url: z.string(),
+    username: z.string(),
+    password: z.string(),
+    notes: z.string().optional(),
+    icon: z.string(),
+    tags: z.array(z.string()).optional(),
+    expiryMonths: z.number().optional(),
+    safeForTravel: z.boolean().optional(),
+  }),
 });
 
 export async function shareCredentialAction(data: z.infer<typeof ShareCredentialSchema>) {
@@ -90,20 +86,17 @@ export async function shareCredentialAction(data: z.infer<typeof ShareCredential
       return { success: false, message: 'Invalid input data for sharing.' };
     }
 
-    const { fromName, toRecipients, credential } = parsedData.data;
+    const { fromUid, fromName, toEmails, credential } = parsedData.data;
 
-    for (const recipient of toRecipients) {
-      // Create a new credential object for the recipient
-      const credentialForRecipient = {
-        ...credential,
-        notes: `Shared by ${fromName}.\n\n${credential.notes || ''}`,
-        sharedWith: [], // A shared credential cannot be re-shared by the recipient
-        isShared: true, // Mark that this credential was shared
-        sharedTo: recipient.email, // Set recipient's email
-      };
-      
-      // Add the credential to the recipient's account
-      await addCredential(recipient.uid, credentialForRecipient);
+    for (const email of toEmails) {
+      // Create a temporary, unencrypted share document.
+      // The recipient will claim, encrypt, and delete this.
+      await createShare({
+        fromUid,
+        fromName,
+        toEmail: email,
+        credential,
+      });
     }
 
     return { success: true, message: 'Credential shared successfully.' };

@@ -65,6 +65,8 @@ import {
   getAuditLogs,
   getDeviceSessions,
   revokeDeviceSession,
+  getSharesForUser,
+  deleteShare,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -172,6 +174,50 @@ export default function DashboardPage() {
     };
   }, [user?.uid]);
 
+  // This effect handles the automatic claiming of shared credentials.
+  useEffect(() => {
+    if (!user?.uid || !user.email) return;
+
+    const unsubscribeShares = getSharesForUser(user.email, async (shares) => {
+      if (shares.length > 0) {
+        for (const share of shares) {
+          try {
+            // Construct the credential to be added
+            const credentialForRecipient = {
+              ...share.credential,
+              notes: `Shared by ${share.fromName}.\n\n${share.credential.notes || ''}`,
+              sharedWith: [], // A shared credential cannot be re-shared
+              isShared: true,
+              sharedTo: user.email!,
+            };
+            
+            // Add the claimed credential to the user's own list. This will encrypt it.
+            await addCredential(user.uid, credentialForRecipient);
+
+            // Delete the temporary share document
+            await deleteShare(share.id);
+            
+            toast({
+              title: "Credential Received",
+              description: `You received a new shared credential for ${share.credential.url} from ${share.fromName}.`
+            });
+          } catch (error) {
+            console.error("Error claiming share:", error);
+            toast({
+              title: 'Error Receiving Credential',
+              description: 'There was a problem receiving a shared item.',
+              variant: 'destructive',
+            });
+          }
+        }
+      }
+    });
+
+    return () => {
+      unsubscribeShares();
+    };
+  }, [user?.uid, user?.email, toast]);
+
   const handleSignOut = async () => {
     if(!user) return;
     await addAuditLog(user.uid, 'User Signed Out', 'User signed out from the application.');
@@ -184,38 +230,42 @@ export default function DashboardPage() {
       
       const newSharedWithEmails = credential.sharedWith || [];
       const addedEmails = newSharedWithEmails.filter(email => !originalSharedWith.includes(email));
+      
+      // Filter for members who actually have an email to share to
+      const membersToShareWith = familyMembers.filter(fm => 
+          addedEmails.includes(fm.email || '') && fm.email
+      );
 
-      if (addedEmails.length > 0) {
-          const membersToShareWith = familyMembers.filter(fm => 
-              addedEmails.includes(fm.email || '') && fm.uid && fm.email
-          );
+      const emailsToShareWith = membersToShareWith.map(m => m.email!);
 
-          if (membersToShareWith.length > 0) {
-              const result = await shareCredentialAction({
-                  fromName: user.displayName || user.email!,
-                  toRecipients: membersToShareWith.map(m => ({ uid: m.uid!, email: m.email! })),
-                  credential: {
-                      url: credential.url,
-                      username: credential.username,
-                      password: credential.password,
-                      notes: credential.notes,
-                      icon: credential.icon,
-                      tags: credential.tags,
-                  }
-              });
-
-              if (result.success) {
-                  toast({
-                      title: "Credential Shared",
-                      description: `Successfully shared with ${membersToShareWith.length} member(s).`
-                  });
-              } else {
-                   toast({
-                      title: "Sharing Failed",
-                      description: result.message,
-                      variant: "destructive"
-                  });
+      if (emailsToShareWith.length > 0) {
+          const result = await shareCredentialAction({
+              fromUid: user.uid,
+              fromName: user.displayName || user.email!,
+              toEmails: emailsToShareWith,
+              credential: {
+                  url: credential.url,
+                  username: credential.username,
+                  password: credential.password,
+                  notes: credential.notes,
+                  icon: credential.icon,
+                  tags: credential.tags,
+                  expiryMonths: credential.expiryMonths,
+                  safeForTravel: credential.safeForTravel,
               }
+          });
+
+          if (result.success) {
+              toast({
+                  title: "Credential Shared",
+                  description: `Your credential has been sent to ${emailsToShareWith.length} member(s).`
+              });
+          } else {
+               toast({
+                  title: "Sharing Failed",
+                  description: result.message,
+                  variant: "destructive"
+              });
           }
       }
   };
@@ -475,7 +525,9 @@ export default function DashboardPage() {
 
       // Filter by selected family member if a member is selected
       if (selectedFamilyMemberId) {
-        if (!credential.sharedWith.includes(selectedFamilyMemberId)) {
+        const member = familyMembers.find(m => m.id === selectedFamilyMemberId);
+        if (!member || !member.email) return false;
+        if (!credential.sharedWith.includes(member.email)) {
           return false;
         }
       }

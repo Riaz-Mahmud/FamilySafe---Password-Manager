@@ -444,3 +444,37 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         referrals,
     };
 }
+
+
+// --- Sharing ---
+
+export async function createShare(shareData: { fromUid: string, fromName: string, toEmail: string, credential: any }): Promise<void> {
+  const sharesCol = collection(db, 'shares');
+  await addDoc(sharesCol, {
+    ...shareData,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export function getSharesForUser(email: string, callback: (shares: any[]) => void): () => void {
+  const sharesCol = collection(db, 'shares');
+  const q = query(sharesCol, where("toEmail", "==", email));
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const shares = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+    }));
+    callback(shares);
+  }, (error) => {
+    console.error("Error fetching shares:", error);
+    callback([]);
+  });
+
+  return unsubscribe;
+}
+
+export async function deleteShare(shareId: string): Promise<void> {
+  const docRef = doc(db, 'shares', shareId);
+  await deleteDoc(docRef);
+}
