@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { DeviceSession } from '@/types';
@@ -85,8 +86,8 @@ export function DeviceManagementPage({ sessions, onRevoke }: DeviceManagementPag
 
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             size="sm"
                             disabled={session.isCurrent}
                             className="w-full sm:w-auto"
