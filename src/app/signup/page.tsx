@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { signUp } from '@/services/auth';
-import { addAuditLog } from '@/services/firestore';
+import { addAuditLog, recordReferral } from '@/services/firestore';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/auth-provider';
 
@@ -22,8 +22,16 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      localStorage.setItem('referralCode', refCode);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -45,6 +53,13 @@ export default function SignupPage() {
     try {
       const newUser = await signUp(email, password);
       await addAuditLog(newUser.uid, 'Account Created', 'User created a new account.');
+      
+      const referrerId = localStorage.getItem('referralCode');
+      if (referrerId) {
+        await recordReferral(referrerId, newUser.uid);
+        localStorage.removeItem('referralCode');
+      }
+
       toast({
         title: 'Success!',
         description: 'Your account has been created. Please log in.',

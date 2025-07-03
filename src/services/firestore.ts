@@ -215,6 +215,29 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
   await deleteDoc(sessionRef);
 }
 
+// --- Referrals ---
+
+export async function recordReferral(referrerId: string, referredUid: string): Promise<void> {
+  if (referrerId === referredUid) return; // Can't refer yourself
+  const referralsCol = collection(db, 'users', referrerId, 'successful_referrals');
+  await addDoc(referralsCol, {
+    referredUid,
+    timestamp: serverTimestamp(),
+  });
+}
+
+export function getReferralCount(userId: string, callback: (count: number) => void): () => void {
+  const referralsCol = collection(db, 'users', userId, 'successful_referrals');
+  const unsubscribe = onSnapshot(referralsCol, (snapshot) => {
+    callback(snapshot.size);
+  }, (error) => {
+    console.error("Error fetching referral count:", error);
+    callback(0);
+  });
+  return unsubscribe;
+}
+
+
 // --- Data Export ---
 
 export async function getUserDataForExport(userId: string): Promise<object> {
@@ -222,12 +245,15 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
     const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
     const sessionsCol = collection(db, 'users', userId, 'sessions');
+    const referralsCol = collection(db, 'users', userId, 'successful_referrals');
 
-    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap] = await Promise.all([
+
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap] = await Promise.all([
         getDocs(query(credentialsCol, orderBy('lastModified', 'desc'))),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(sessionsCol, orderBy('lastSeen', 'desc'))),
+        getDocs(query(referralsCol, orderBy('timestamp', 'desc'))),
     ]);
 
     const credentials = credentialsSnap.docs.map(doc => {
@@ -266,11 +292,21 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             lastSeen: formatTimestamp(data.lastSeen),
          };
     });
+
+    const referrals = referralsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+           id: doc.id,
+           referredUid: data.referredUid,
+           timestamp: formatTimestamp(data.timestamp),
+        };
+    });
     
     return {
         credentials,
         familyMembers,
         auditLogs,
         deviceSessions,
+        referrals,
     };
 }

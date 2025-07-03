@@ -7,10 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateUserProfile, sendPasswordReset } from '@/services/auth';
-import { getUserDataForExport } from '@/services/firestore';
-import { Loader2 } from 'lucide-react';
+import { getUserDataForExport, getReferralCount } from '@/services/firestore';
+import { Loader2, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export function SettingsPage() {
@@ -20,6 +20,22 @@ export function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [referralLink, setReferralLink] = useState('');
+  const [referralCount, setReferralCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      if (typeof window !== 'undefined') {
+        setReferralLink(`${window.location.origin}/signup?ref=${user.uid}`);
+      }
+      
+      const unsubscribe = getReferralCount(user.uid, (count) => {
+        setReferralCount(count);
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +109,14 @@ export function SettingsPage() {
     }
   };
   
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(referralLink);
+    toast({
+      title: 'Copied!',
+      description: 'Referral link copied to clipboard.',
+    });
+  };
+
   const handleDeleteAccount = () => {
     toast({
       title: 'Account Deletion Action',
@@ -130,6 +154,27 @@ export function SettingsPage() {
               Save Changes
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Refer & Earn</CardTitle>
+          <CardDescription>Invite friends to FamilySafe and earn rewards (coming soon!).</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="referral-link">Your Unique Referral Link</Label>
+            <div className="flex gap-2">
+              <Input id="referral-link" value={referralLink} readOnly />
+              <Button variant="outline" size="icon" onClick={handleCopyLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium">Successful Referrals: <span className="text-primary font-bold">{referralCount}</span></p>
+          </div>
         </CardContent>
       </Card>
       
