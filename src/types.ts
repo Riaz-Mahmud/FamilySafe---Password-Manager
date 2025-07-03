@@ -42,3 +42,15 @@ export interface DeviceSession {
   createdAt: string;
   isCurrent: boolean;
 }
+
+export interface SecureDocument {
+  id: string;
+  name: string;
+  notes: string; // encrypted
+  fileDataUrl: string; // encrypted
+  fileType: string;
+  fileSize: number;
+  lastModified: string;
+  createdAt: string;
+  icon: string; // lucide icon name
+}

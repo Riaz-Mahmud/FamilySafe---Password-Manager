@@ -1,6 +1,6 @@
 
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember, AuditLog, DeviceSession } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument } from '@/types';
 import {
   collection,
   addDoc,
@@ -118,7 +118,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
         }
       }
 
-      const finalCredentials = [...ownCredentials, ...validSharedCredentials];
+      const finalCredentials = [...ownCredentials, ...validSharedCredentials].sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
       callback(finalCredentials);
 
       // Asynchronously delete stale credentials in the background.
@@ -401,6 +401,75 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
   await deleteDoc(sessionRef);
 }
 
+// --- Secure Documents ---
+
+export function getSecureDocuments(userId: string, callback: (documents: SecureDocument[]) => void): () => void {
+  const documentsCol = collection(db, 'users', userId, 'secureDocuments');
+  const q = query(documentsCol, orderBy('lastModified', 'desc'));
+  
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const documents = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name,
+          notes: decryptData(data.notes, userId),
+          fileDataUrl: decryptData(data.fileDataUrl, userId),
+          fileType: data.fileType,
+          fileSize: data.fileSize,
+          icon: data.icon,
+          lastModified: formatTimestamp(data.lastModified),
+          createdAt: formatTimestamp(data.createdAt),
+        } as SecureDocument;
+    });
+    callback(documents);
+  }, (error) => {
+    console.error("Error fetching secure documents:", error);
+    callback([]);
+  });
+
+  return unsubscribe;
+}
+
+export async function addSecureDocument(userId: string, documentData: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt'>): Promise<string> {
+  const documentsCol = collection(db, 'users', userId, 'secureDocuments');
+  
+  const encryptedDocument = {
+    ...documentData,
+    notes: encryptData(documentData.notes, userId),
+    fileDataUrl: encryptData(documentData.fileDataUrl, userId),
+    createdAt: serverTimestamp(),
+    lastModified: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(documentsCol, encryptedDocument);
+  return docRef.id;
+}
+
+export async function updateSecureDocument(userId: string, id: string, documentData: Partial<Omit<SecureDocument, 'id' | 'createdAt'>>): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'secureDocuments', id);
+  
+  const encryptedUpdate: { [key: string]: any } = { ...documentData };
+
+  // Only encrypt fields that are present in the update
+  if (documentData.hasOwnProperty('notes')) {
+    encryptedUpdate.notes = encryptData(documentData.notes || '', userId);
+  }
+  if (documentData.fileDataUrl) {
+    encryptedUpdate.fileDataUrl = encryptData(documentData.fileDataUrl, userId);
+  }
+
+  await updateDoc(docRef, {
+      ...encryptedUpdate,
+      lastModified: serverTimestamp(),
+  });
+}
+
+export async function deleteSecureDocument(userId: string, id: string): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'secureDocuments', id);
+  await deleteDoc(docRef);
+}
+
 // --- Referrals & Invitations ---
 
 export async function recordReferral(referrerId: string, referredUid: string): Promise<void> {
@@ -486,7 +555,7 @@ export async function deleteUserData(userId: string): Promise<void> {
   }
   
   // Delete all subcollections under the user's document.
-  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals'];
+  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments'];
   const deleteSubCollectionPromises = subcollections.map(sub => deleteCollection(`users/${userId}/${sub}`));
   await Promise.all(deleteSubCollectionPromises);
 
@@ -504,14 +573,15 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const auditLogsCol = collection(db, 'users', userId, 'auditLogs');
     const sessionsCol = collection(db, 'users', userId, 'sessions');
     const referralsCol = collection(db, 'users', userId, 'successful_referrals');
+    const secureDocumentsCol = collection(db, 'users', userId, 'secureDocuments');
 
-
-    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap] = await Promise.all([
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap] = await Promise.all([
         getDocs(query(credentialsCol, orderBy('lastModified', 'desc'))),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(sessionsCol, orderBy('lastSeen', 'desc'))),
         getDocs(query(referralsCol, orderBy('timestamp', 'desc'))),
+        getDocs(query(secureDocumentsCol, orderBy('lastModified', 'desc'))),
     ]);
 
     const credentials = credentialsSnap.docs.map(doc => {
@@ -529,6 +599,21 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             tags: data.tags || [],
             expiryMonths: data.expiryMonths,
             sharedBy: data.sharedBy,
+        };
+    });
+    
+    const secureDocuments = secureDocumentsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            name: data.name,
+            notes: decryptData(data.notes, userId),
+            // Note: fileDataUrl is intentionally not exported for security and size reasons.
+            // Users should download files individually from the UI.
+            fileType: data.fileType,
+            fileSize: data.fileSize,
+            lastModified: formatTimestamp(data.lastModified),
+            createdAt: formatTimestamp(data.createdAt),
         };
     });
 
@@ -565,6 +650,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     
     return {
         credentials,
+        secureDocuments,
         familyMembers,
         auditLogs,
         deviceSessions,

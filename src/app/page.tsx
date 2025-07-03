@@ -30,6 +30,7 @@ import {
   MonitorSmartphone,
   Plane,
   Share2,
+  FolderLock,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember, AuditLog, DeviceSession } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -67,6 +68,10 @@ import {
   revokeDeviceSession,
   getSharesForUser,
   deleteShare,
+  getSecureDocuments,
+  addSecureDocument,
+  updateSecureDocument,
+  deleteSecureDocument,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -80,6 +85,8 @@ import { DeviceManagementPage } from '@/components/dashboard/device-management-p
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { sendInvitationEmailAction, shareCredentialAction } from '@/app/actions';
+import { AddSecureDocumentDialog } from '@/components/dashboard/add-secure-document-dialog';
+import { SecureDocumentList } from '@/components/dashboard/secure-document-list';
 
 
 export default function DashboardPage() {
@@ -87,16 +94,20 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [secureDocuments, setSecureDocuments] = useState<SecureDocument[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
+  const [isAddDocumentDialogOpen, setAddDocumentDialogOpen] = useState(false);
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState('All Passwords');
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
+  const [editingDocument, setEditingDocument] = useState<SecureDocument | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteDocumentTargetId, setDeleteDocumentTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
@@ -128,6 +139,7 @@ export default function DashboardPage() {
       setFamilyMembers([]);
       setAuditLogs([]);
       setDeviceSessions([]);
+      setSecureDocuments([]);
       setIsDataLoading(false);
       return;
     }
@@ -135,7 +147,7 @@ export default function DashboardPage() {
     setIsDataLoading(true);
     
     let loadedCount = 0;
-    const totalToLoad = 4;
+    const totalToLoad = 5;
 
     const checkDone = () => {
       loadedCount++;
@@ -165,12 +177,18 @@ export default function DashboardPage() {
       checkDone();
     });
 
+    const unsubscribeSecureDocuments = getSecureDocuments(user.uid, (docs) => {
+      setSecureDocuments(docs);
+      checkDone();
+    });
+
 
     return () => {
       unsubscribeCredentials();
       unsubscribeFamilyMembers();
       unsubscribeAuditLogs();
       unsubscribeSessions();
+      unsubscribeSecureDocuments();
     };
   }, [user?.uid]);
 
@@ -342,6 +360,59 @@ export default function DashboardPage() {
       }
     }
   };
+
+  const handleAddSecureDocument = async (newDocument: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt'>) => {
+    if(!user) return;
+    try {
+      await addSecureDocument(user.uid, newDocument);
+      await addAuditLog(user.uid, 'Create Secure Document', `Saved document named ${newDocument.name}.`);
+      toast({
+        title: 'Document Added',
+        description: 'The new secure document has been saved successfully.',
+      });
+    } catch (error) {
+      console.error("Error adding document:", error);
+      toast({ title: 'Error', description: 'Failed to add secure document.', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdateSecureDocument = async (updatedDocument: SecureDocument) => {
+    if(!user) return;
+    try {
+      const { id, ...dataToUpdate } = updatedDocument;
+      await updateSecureDocument(user.uid, id, dataToUpdate);
+      await addAuditLog(user.uid, 'Update Secure Document', `Updated document named ${updatedDocument.name}.`);
+      toast({
+        title: 'Document Updated',
+        description: 'The secure document has been updated successfully.',
+      });
+    } catch (error) {
+      console.error("Error updating document:", error);
+      toast({ title: 'Error', description: 'Failed to update secure document.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteSecureDocument = async () => {
+    if (deleteDocumentTargetId && user) {
+      const docToDelete = secureDocuments.find(d => d.id === deleteDocumentTargetId);
+      try {
+        await deleteSecureDocument(user.uid, deleteDocumentTargetId);
+        if (docToDelete) {
+           await addAuditLog(user.uid, 'Delete Secure Document', `Deleted document named ${docToDelete.name}.`);
+        }
+        toast({
+          title: 'Document Deleted',
+          description: 'The secure document has been permanently deleted.',
+          variant: 'destructive',
+        });
+      } catch (error) {
+        console.error("Error deleting document:", error);
+        toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+      } finally {
+        setDeleteDocumentTargetId(null);
+      }
+    }
+  };
   
   const handleAddFamilyMember = async (memberData: Omit<FamilyMember, 'id' | 'avatar' | 'uid'> & { sendInvite?: boolean }) => {
     if (!user) return;
@@ -479,6 +550,23 @@ export default function DashboardPage() {
     }
     setAddDialogOpen(open);
   };
+  
+  const openAddDocumentDialog = () => {
+    setEditingDocument(null);
+    setAddDocumentDialogOpen(true);
+  };
+
+  const openEditDocumentDialog = (doc: SecureDocument) => {
+    setEditingDocument(doc);
+    setAddDocumentDialogOpen(true);
+  };
+
+  const handleDocumentDialogChange = (open: boolean) => {
+    if (!open) {
+      setEditingDocument(null);
+    }
+    setAddDocumentDialogOpen(open);
+  };
 
   const openAddFamilyMemberDialog = () => {
     setEditingFamilyMember(null);
@@ -561,6 +649,19 @@ export default function DashboardPage() {
       return true;
   });
 
+  const filteredDocuments = secureDocuments.filter(doc => {
+      // Filter by search term
+      if (searchTerm) {
+          const lowerCaseSearchTerm = searchTerm.toLowerCase();
+          const searchMatch =
+          doc.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+          doc.fileType.toLowerCase().includes(lowerCaseSearchTerm);
+          if (!searchMatch) return false;
+      }
+      
+      return true;
+  });
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -594,6 +695,14 @@ export default function DashboardPage() {
             onSend={openSendEmailDialog}
             onMemberSelect={handleSelectFamilyMember}
             isTravelModeActive={isTravelModeActive}
+          />
+        );
+      case 'Secure Documents':
+        return (
+          <SecureDocumentList
+            documents={filteredDocuments}
+            onEdit={openEditDocumentDialog}
+            onDelete={setDeleteDocumentTargetId}
           />
         );
       case 'Family Members':
@@ -644,6 +753,16 @@ export default function DashboardPage() {
               >
                 <Home />
                 All Passwords
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => handleMenuClick('Secure Documents')}
+                isActive={activeMenu === 'Secure Documents'}
+                tooltip="Secure Documents"
+              >
+                <FolderLock />
+                Secure Documents
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -763,7 +882,7 @@ export default function DashboardPage() {
         <div className="p-4 sm:p-6 lg:p-8 flex flex-col h-screen">
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
-            {activeMenu === 'All Passwords' || activeMenu === 'My Passwords' ? (
+            {activeMenu === 'All Passwords' || activeMenu === 'My Passwords' || activeMenu === 'Shared Passwords' ? (
               <>
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -779,16 +898,22 @@ export default function DashboardPage() {
                   <span className="hidden md:inline">Add Credential</span>
                 </Button>
               </>
-            ) : activeMenu === 'Shared Passwords' ? (
-               <div className="relative flex-1">
+            ) : activeMenu === 'Secure Documents' ? (
+              <>
+                <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search passwords by site, username, or tag..."
+                    placeholder="Search documents by name or file type..."
                     className="pl-10 w-full max-w-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
+                <Button onClick={openAddDocumentDialog} className="font-semibold">
+                  <Plus className="h-5 w-5 md:mr-2" />
+                  <span className="hidden md:inline">Add Document</span>
+                </Button>
+              </>
             ) : activeMenu === 'Family Members' ? (
               <>
                 <div className="flex-1" />
@@ -814,6 +939,14 @@ export default function DashboardPage() {
         onUpdateCredential={handleUpdateCredential}
         familyMembers={familyMembers}
         credentialToEdit={editingCredential}
+      />
+
+      <AddSecureDocumentDialog
+        open={isAddDocumentDialogOpen}
+        onOpenChange={handleDocumentDialogChange}
+        onAddDocument={handleAddSecureDocument}
+        onUpdateDocument={handleUpdateSecureDocument}
+        documentToEdit={editingDocument}
       />
 
       <AddFamilyMemberDialog
@@ -844,6 +977,23 @@ export default function DashboardPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteCredential} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteDocumentTargetId} onOpenChange={(open) => !open && setDeleteDocumentTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this secure document from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteDocumentTargetId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSecureDocument} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
