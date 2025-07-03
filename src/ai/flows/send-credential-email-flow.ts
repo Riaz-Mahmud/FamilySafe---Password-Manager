@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview A flow to generate and send an email with credential details.
- * This flow sends a real email using SendGrid if configured.
+ * This flow now uses the centralized email service.
  *
  * - sendCredentialEmail - A function that handles generating and sending the email.
  * - SendCredentialEmailInput - The input type for the sendCredentialEmail function.
@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import sgMail from '@sendgrid/mail';
+import { sendEmail } from '@/services/email';
 
 const SendCredentialEmailInputSchema = z.object({
   emails: z.array(z.string().email()).describe('The list of email addresses to send the credential to.'),
@@ -31,64 +31,19 @@ export async function sendCredentialEmail(input: SendCredentialEmailInput): Prom
     body: `Hello,\n\nHere are the credential details for ${input.url}, shared from your FamilySafe account:\n\nWebsite/Application: ${input.url}\nUsername: ${input.username}\nPassword: ${input.password}\n\nRegards,\nThe FamilySafe Team`
   };
 
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
-  
-  if (!sendGridApiKey || !sendGridFromEmail) {
-    console.warn('SendGrid API Key or From Email not found in environment variables. Email will not be sent.');
+  const result = await sendEmail({
+    to: input.emails,
+    subject: emailContent.subject,
+    body: emailContent.body
+  });
+
+  if (result.success) {
     return {
-      success: false,
-      message: 'Email service is not configured on the server. Could not send email.',
+      success: true,
+      message: `An email with the credentials for ${input.url} has been sent to the selected recipients.`,
     };
-  }
-
-  sgMail.setApiKey(sendGridApiKey);
-  const msg = {
-      to: input.emails,
-      from: sendGridFromEmail,
-      subject: emailContent.subject,
-      text: emailContent.body,
-      trackingSettings: {
-        clickTracking: {
-          enable: false,
-        },
-      },
-  };
-
-  try {
-      await sgMail.send(msg);
-      console.log('Credential email sent successfully via SendGrid.');
-      return {
-        success: true,
-        message: `An email with the credentials for ${input.url} has been sent to the selected recipients.`,
-      };
-  } catch (error: any) {
-      console.error('Error sending credential email via SendGrid:', JSON.stringify(error, null, 2));
-       if (error.response) {
-          const sendGridErrorBody = error.response.body;
-          if (sendGridErrorBody?.errors?.length > 0) {
-            const firstError = sendGridErrorBody.errors[0];
-            if (firstError.message.includes('authorization')) {
-               return { 
-                  success: false, 
-                  message: 'SendGrid Authorization Failed: Please check if your SENDGRID_API_KEY is correct and has the required permissions.' 
-               };
-            }
-            if (firstError.message.includes('does not match a verified Sender Identity')) {
-               return { 
-                  success: false, 
-                  message: 'SendGrid Sender Error: The "from" email address has not been verified in your SendGrid account. Please complete sender verification.'
-               };
-            }
-            return {
-               success: false,
-               message: `SendGrid Error: ${firstError.message}`
-            };
-          }
-      }
-      return { 
-          success: false, 
-          message: 'An unexpected error occurred while sending the email. Please check the server logs for more details.' 
-      };
+  } else {
+    // The specific error message from the email service is passed through.
+    return result;
   }
 }

@@ -9,9 +9,9 @@
  */
 
 import { z } from 'zod';
-import sgMail from '@sendgrid/mail';
 import { adminAuth, adminDb, isFirebaseAdminInitialized } from '@/lib/firebase-admin';
 import { sha256 } from '@/lib/crypto';
+import { sendEmail } from '@/services/email';
 
 const AccountRecoveryInputSchema = z.object({
   email: z.string().email().describe('The email address for the account to recover.'),
@@ -28,16 +28,9 @@ export type AccountRecoveryOutput = z.infer<typeof AccountRecoveryOutputSchema>;
 export async function recoverAccount(input: AccountRecoveryInput): Promise<AccountRecoveryOutput> {
   const { email, secretKey } = input;
   
-  const sendGridApiKey = process.env.SENDGRID_API_KEY;
-  const sendGridFromEmail = process.env.SENDGRID_FROM_EMAIL;
-  
-  // Check if all necessary services are configured before proceeding
-  if (!isFirebaseAdminInitialized || !adminAuth || !adminDb || !sendGridApiKey || !sendGridFromEmail) {
-    const message = 'The account recovery feature is not fully configured on the server. Please contact support.';
-    console.error(message, {
-        firebaseAdmin: isFirebaseAdminInitialized,
-        sendGrid: !!sendGridApiKey && !!sendGridFromEmail,
-    });
+  if (!isFirebaseAdminInitialized || !adminAuth || !adminDb) {
+    const message = 'The account recovery feature is not fully configured on the server (Firebase Admin). Please contact support.';
+    console.error(message);
     return { success: false, message };
   }
 
@@ -69,60 +62,23 @@ export async function recoverAccount(input: AccountRecoveryInput): Promise<Accou
     // 4. If hashes match, generate a password reset link
     const resetLink = await adminAuth.generatePasswordResetLink(email);
 
-    // 5. Send the email using SendGrid
-    sgMail.setApiKey(sendGridApiKey);
-    const msg = {
+    // 5. Send the email using the centralized email service
+    const emailResult = await sendEmail({
       to: email,
-      from: sendGridFromEmail,
       subject: 'Your FamilySafe Account Recovery Link',
-      text: `Hello,\n\nYou have requested to recover your FamilySafe account. Please use the following link to reset your password:\n\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.\n\nThe FamilySafe Team`,
-      trackingSettings: {
-        clickTracking: {
-          enable: false,
-        },
-      },
-    };
+      body: `Hello,\n\nYou have requested to recover your FamilySafe account. Please use the following link to reset your password:\n\n${resetLink}\n\nIf you did not request this, you can safely ignore this email.\n\nThe FamilySafe Team`,
+    });
 
-    await sgMail.send(msg);
-
-    return { success: true, message: 'Recovery email sent successfully.' };
+    // The sendEmail service handles its own logging and error formatting.
+    // We just pass its result along.
+    return emailResult;
 
   } catch (error: any) {
-    // Check for SendGrid-specific error structure first, as it has a `response` property
-    if (error.response) {
-      const sendGridErrorBody = error.response.body;
-      console.error('SendGrid Error during account recovery:', JSON.stringify(sendGridErrorBody, null, 2));
-      if (sendGridErrorBody?.errors?.length > 0) {
-        const firstError = sendGridErrorBody.errors[0];
-        if (firstError.message.includes('authorization')) {
-           return { 
-              success: false, 
-              message: 'SendGrid Authorization Failed: Please check if your SENDGRID_API_KEY is correct and has the required permissions.' 
-           };
-        }
-        if (firstError.message.includes('does not match a verified Sender Identity')) {
-           return { 
-              success: false, 
-              message: 'SendGrid Sender Error: The "from" email address has not been verified in your SendGrid account. Please complete sender verification.'
-           };
-        }
-        return {
-           success: false,
-           message: `SendGrid Error: ${firstError.message}`
-        };
-      }
-      return {
-          success: false,
-          message: 'An unexpected error occurred while sending the email. Please check the server logs for more details.'
-      };
-    }
-    
-    // Fallback to Firebase/generic error handling
     if (error.code === 'auth/user-not-found') {
       return { success: false, message: 'No user found with this email address.' };
     }
 
-    console.error('Error during account recovery:', error);
+    console.error('Error during account recovery validation:', error);
     return { success: false, message: 'An unexpected error occurred during account recovery.' };
   }
 }
