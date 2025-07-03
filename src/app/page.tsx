@@ -437,7 +437,7 @@ export default function DashboardPage() {
       
       // Filter by active menu second, as it's the primary mode
       if (activeMenu === 'My Passwords') {
-        if (credential.sharedWith.length !== 0 || credential.isShared) return false;
+        if (credential.isShared) return false;
       }
 
       // Filter by selected family member if a member is selected
