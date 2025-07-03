@@ -13,6 +13,7 @@ import { getUserDataForExport, getReferralCount, deleteUserData } from '@/servic
 import { Loader2, Copy } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useRouter } from 'next/navigation';
+import { RecoveryKitDialog } from './recovery-kit-dialog';
 
 export function SettingsPage() {
   const { user, refreshUser } = useAuth();
@@ -25,6 +26,8 @@ export function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [referralLink, setReferralLink] = useState('');
   const [referralCount, setReferralCount] = useState(0);
+  const [isRecoveryKitOpen, setRecoveryKitOpen] = useState(false);
+
 
   useEffect(() => {
     if (user) {
@@ -151,6 +154,7 @@ export function SettingsPage() {
 
 
   return (
+    <>
     <div className="space-y-6">
       <Card>
         <CardHeader>
@@ -206,17 +210,26 @@ export function SettingsPage() {
           <CardTitle>Security</CardTitle>
           <CardDescription>Manage your account security settings.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
+        <CardContent className="space-y-6">
+           <div className="space-y-2">
             <h3 className="font-medium">Change Password</h3>
             <p className="text-sm text-muted-foreground">
               A password reset link will be sent to your email.
             </p>
+             <Button variant="outline" onClick={handlePasswordReset} disabled={isSendingReset}>
+              {isSendingReset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send Password Reset Email
+            </Button>
           </div>
-           <Button variant="outline" onClick={handlePasswordReset} disabled={isSendingReset}>
-             {isSendingReset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Send Password Reset Email
-          </Button>
+           <div className="space-y-2">
+            <h3 className="font-medium">Account Recovery</h3>
+            <p className="text-sm text-muted-foreground">
+              Generate a printable recovery kit in case you lose access to your account.
+            </p>
+             <Button variant="outline" onClick={() => setRecoveryKitOpen(true)}>
+              Generate Recovery Kit
+            </Button>
+          </div>
         </CardContent>
       </Card>
       
@@ -266,5 +279,11 @@ export function SettingsPage() {
         </CardContent>
       </Card>
     </div>
+    <RecoveryKitDialog
+        open={isRecoveryKitOpen}
+        onOpenChange={setRecoveryKitOpen}
+        user={user}
+    />
+    </>
   );
 }
