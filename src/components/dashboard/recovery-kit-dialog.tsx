@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { User } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertTriangle, Copy, Printer, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Copy, Printer, ShieldCheck, Loader2 } from 'lucide-react';
+import { saveRecoveryKeyHash } from '@/services/firestore';
+import { useAuth } from '@/context/auth-provider';
 
 type RecoveryKitDialogProps = {
   open: boolean;
@@ -29,14 +31,31 @@ export function RecoveryKitDialog({
   user,
 }: RecoveryKitDialogProps) {
   const [secretKey, setSecretKey] = useState('');
+  const [isSavingKey, setIsSavingKey] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (open) {
+    if (open && user) {
+      setIsSavingKey(true);
       // Generate a new key each time the dialog is opened for security.
-      setSecretKey(crypto.randomUUID());
+      const newSecretKey = crypto.randomUUID();
+      setSecretKey(newSecretKey);
+      
+      saveRecoveryKeyHash(user.uid, newSecretKey)
+        .then(() => {
+          setIsSavingKey(false);
+        })
+        .catch((error) => {
+          console.error("Failed to save recovery key hash:", error);
+          setIsSavingKey(false);
+          toast({
+            title: 'Error',
+            description: 'Could not prepare recovery kit. Please try again.',
+            variant: 'destructive',
+          });
+        });
     }
-  }, [open]);
+  }, [open, user, toast]);
 
   const handlePrint = () => {
     window.print();
@@ -111,9 +130,9 @@ export function RecoveryKitDialog({
                  <h4 className="font-semibold">Secret Recovery Key</h4>
                  <div className="flex items-center gap-2 mt-1">
                     <p className="text-muted-foreground font-mono p-2 bg-secondary rounded-md text-sm w-full break-all">
-                      {secretKey}
+                      {isSavingKey ? 'Generating...' : secretKey}
                     </p>
-                    <Button variant="outline" size="icon" className="no-print" onClick={() => handleCopy(secretKey, 'Secret Key')}>
+                    <Button variant="outline" size="icon" className="no-print" onClick={() => handleCopy(secretKey, 'Secret Key')} disabled={isSavingKey}>
                         <Copy className="h-4 w-4" />
                     </Button>
                  </div>
@@ -122,7 +141,13 @@ export function RecoveryKitDialog({
               <div>
                 <h4 className="font-semibold mb-2">Emergency QR Code</h4>
                 <div className="p-4 bg-white rounded-lg inline-block">
-                    <QRCodeSVG value={qrCodeValue} size={160} />
+                    {isSavingKey ? (
+                        <div className="h-[160px] w-[160px] flex items-center justify-center bg-gray-200 rounded-md">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : (
+                        <QRCodeSVG value={qrCodeValue} size={160} />
+                    )}
                 </div>
                  <p className="text-xs text-muted-foreground mt-2">
                     A trusted family member can scan this code to help you start the recovery process.
@@ -141,8 +166,8 @@ export function RecoveryKitDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Close
             </Button>
-            <Button type="button" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" />
+            <Button type="button" onClick={handlePrint} disabled={isSavingKey}>
+              {isSavingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Print Kit
             </Button>
           </DialogFooter>

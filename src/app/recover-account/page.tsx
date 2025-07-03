@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ShieldQuestion } from 'lucide-react';
-import { sendPasswordReset } from '@/services/auth';
+import { recoverAccountAction } from '@/app/actions';
 
 export default function RecoverAccountPage() {
   const [email, setEmail] = useState('');
@@ -21,28 +21,19 @@ export default function RecoverAccountPage() {
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // In a full implementation, the secretKey would be validated against a stored key
-    // on the backend before sending the reset email. For this prototype, we will proceed 
-    // with sending the email directly if the form is submitted.
-    try {
-      // For security, we don't want to reveal if an email is registered or not.
-      // We'll send the reset email and show a generic message regardless of whether
-      // the user was found. The backend handles the actual existence check.
-      await sendPasswordReset(email);
-      toast({
-        title: 'Check Your Email',
-        description: 'If an account exists for this email, you will receive a password reset link.',
-      });
-    } catch (error: any) {
-      console.error("Password reset attempt error:", error);
-      // We still show a generic message to the user to prevent email enumeration attacks.
-      toast({
-        title: 'Check Your Email',
-        description: 'If an account exists for this email, you will receive a password reset link.',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+
+    // Call the secure server action
+    await recoverAccountAction({ email, secretKey });
+
+    // For security, always show a generic message to the user to prevent
+    // email enumeration or key-guessing attacks. The actual success/failure
+    // is handled on the server.
+    toast({
+      title: 'Check Your Email',
+      description: 'If your email and secret key are valid, you will receive a password reset link.',
+    });
+    
+    setIsLoading(false);
   };
 
   return (

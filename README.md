@@ -93,14 +93,21 @@ npm install
 Create a `.env` file in the root of your project by copying the example below. You will need to get these values from your Firebase project settings and your SendGrid account.
 
 ```env
-# Firebase Configuration
-# Find these in your Firebase project settings -> General
+# Firebase Client-Side Configuration
+# Find these in your Firebase project settings -> General -> Your web app
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+
+# Firebase Server-Side Configuration (for Admin SDK)
+# Go to Firebase Console -> Project Settings -> Service accounts -> Generate new private key
+# Copy the values from the downloaded JSON file.
+# Note: For the private key, you may need to wrap it in quotes if it contains special characters.
+FIREBASE_CLIENT_EMAIL=your_firebase_client_email_from_service_account_json
+FIREBASE_PRIVATE_KEY=your_firebase_private_key_from_service_account_json
 
 # SendGrid Configuration (for sending credentials via email)
 # Create an API key in your SendGrid dashboard
@@ -111,9 +118,10 @@ SENDGRID_FROM_EMAIL=your_verified_sendgrid_email
 
 **Firebase Setup:**
 1.  Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project.
-2.  In your project, go to **Project Settings** > **General** and find your web app's configuration details to fill in the variables above.
-3.  Go to **Authentication** > **Sign-in method** and enable **Email/Password** and **Google** providers.
-4.  Go to **Firestore Database**, create a database, and start in **Production mode**. You will need to configure your security rules to allow authenticated users to read/write their own data.
+2.  In your project, go to **Project Settings** > **General** and find your web app's configuration details to fill in the `NEXT_PUBLIC_` variables above.
+3.  Go to **Project Settings** > **Service accounts** and click **Generate new private key**. A JSON file will be downloaded. Use the `client_email` and `private_key` values from this file to fill in the server-side variables above.
+4.  Go to **Authentication** > **Sign-in method** and enable **Email/Password** and **Google** providers.
+5.  Go to **Firestore Database**, create a database, and start in **Production mode**. You will need to configure your security rules to allow authenticated users to read/write their own data.
 
 ### 4. Run the Development Server
 

@@ -1,6 +1,4 @@
 
-'use client';
-
 import CryptoJS from 'crypto-js';
 
 /**
@@ -35,4 +33,13 @@ export function decryptData(ciphertext: string, key: string): string {
     console.error('Decryption failed, returning raw data:', error);
     return ciphertext;
   }
+}
+
+/**
+ * Hashes a string using SHA-256.
+ * @param text The string to hash.
+ * @returns The SHA-256 hash as a hex string.
+ */
+export function sha256(text: string): string {
+  return CryptoJS.SHA256(text).toString(CryptoJS.enc.Hex);
 }

@@ -1,5 +1,6 @@
 
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
 import {
@@ -18,8 +19,9 @@ import {
   where,
   limit,
   writeBatch,
+  setDoc,
 } from 'firebase/firestore';
-import { encryptData, decryptData } from '@/lib/crypto';
+import { encryptData, decryptData, sha256 } from '@/lib/crypto';
 
 // --- Helpers ---
 
@@ -106,12 +108,14 @@ export async function deleteVault(userId: string, vaultId: string): Promise<void
 
 export function getCredentials(userId: string, callback: (credentials: Credential[]) => void): () => void {
   const credentialsCol = collection(db, 'users', userId, 'credentials');
-  const q = query(credentialsCol, orderBy('lastModified', 'desc'));
+  const q = query(credentialsCol);
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const credentialsFromDb = snapshot.docs.map(doc => {
         const data = doc.data();
-        const key = userId; // Decryption is always done with the current user's key.
+        // Shared items are encrypted with the recipient's key, not the owner's.
+        // The current user (userId) is always the recipient.
+        const key = userId;
         return {
           id: doc.id,
           url: data.url,
@@ -130,6 +134,8 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           ownerName: data.ownerName,
         } as Credential;
     });
+     // Sort client-side to avoid needing a composite index
+    credentialsFromDb.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(credentialsFromDb);
   }, (error) => {
     console.error("Error fetching credentials:", error);
@@ -163,13 +169,7 @@ export async function addCredential(userId: string, vaultId: string, credential:
 export async function updateCredential(userId: string, id: string, credential: Partial<Omit<Credential, 'id' | 'createdAt'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
   
-  // Create a new object with only defined values to prevent Firestore errors
-  const dataToUpdate: { [key: string]: any } = {};
-  for (const key in credential) {
-      if (credential[key as keyof typeof credential] !== undefined) {
-          dataToUpdate[key] = credential[key as keyof typeof credential];
-      }
-  }
+  const dataToUpdate = { ...credential };
   
   if (dataToUpdate.username) {
     dataToUpdate.username = encryptData(dataToUpdate.username, userId);
@@ -180,21 +180,14 @@ export async function updateCredential(userId: string, id: string, credential: P
   if (dataToUpdate.hasOwnProperty('notes')) {
     dataToUpdate.notes = encryptData(dataToUpdate.notes || '', userId);
   }
-  if (dataToUpdate.hasOwnProperty('expiryMonths')) {
-    dataToUpdate.expiryMonths = dataToUpdate.expiryMonths || null;
-  }
-  if (dataToUpdate.hasOwnProperty('safeForTravel')) {
-    dataToUpdate.safeForTravel = dataToUpdate.safeForTravel || false;
-  }
-  if (dataToUpdate.hasOwnProperty('sharedWith')) {
-    dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
-  }
-  if (dataToUpdate.ownerId === undefined) {
-      delete dataToUpdate.ownerId;
-  }
-  if (dataToUpdate.ownerName === undefined) {
-      delete dataToUpdate.ownerName;
-  }
+  
+  // Clean up any undefined fields before sending to Firestore
+  Object.keys(dataToUpdate).forEach(key => {
+      const typedKey = key as keyof typeof dataToUpdate;
+      if (dataToUpdate[typedKey] === undefined) {
+          delete dataToUpdate[typedKey];
+      }
+  });
 
   await updateDoc(docRef, {
       ...dataToUpdate,
@@ -399,7 +392,7 @@ export async function revokeDeviceSession(userId: string, sessionId: string): Pr
 
 export function getSecureDocuments(userId: string, callback: (documents: SecureDocument[]) => void): () => void {
   const documentsCol = collection(db, 'users', userId, 'secureDocuments');
-  const q = query(documentsCol, orderBy('lastModified', 'desc'));
+  const q = query(documentsCol);
   
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const documents = snapshot.docs.map(doc => {
@@ -421,6 +414,8 @@ export function getSecureDocuments(userId: string, callback: (documents: SecureD
           ownerName: data.ownerName,
         } as SecureDocument;
     });
+    // Sort client-side to avoid needing a composite index
+    documents.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
     callback(documents);
   }, (error) => {
     console.error("Error fetching secure documents:", error);
@@ -450,13 +445,7 @@ export async function addSecureDocument(userId: string, vaultId: string, documen
 export async function updateSecureDocument(userId: string, id: string, documentData: Partial<Omit<SecureDocument, 'id' | 'createdAt'>>): Promise<void> {
   const docRef = doc(db, 'users', userId, 'secureDocuments', id);
   
-  // Create a new object with only defined values to prevent Firestore errors
-  const dataToUpdate: { [key: string]: any } = {};
-  for (const key in documentData) {
-      if (documentData[key as keyof typeof documentData] !== undefined) {
-          dataToUpdate[key] = documentData[key as keyof typeof documentData];
-      }
-  }
+  const dataToUpdate = { ...documentData };
 
   // Only encrypt fields that are present in the update
   if (dataToUpdate.notes !== undefined) {
@@ -465,15 +454,14 @@ export async function updateSecureDocument(userId: string, id: string, documentD
   if (dataToUpdate.fileDataUrl) {
     dataToUpdate.fileDataUrl = encryptData(dataToUpdate.fileDataUrl, userId);
   }
-  if (dataToUpdate.sharedWith !== undefined) {
-    dataToUpdate.sharedWith = dataToUpdate.sharedWith || [];
-  }
-   if (dataToUpdate.ownerId === undefined) {
-      delete dataToUpdate.ownerId;
-  }
-  if (dataToUpdate.ownerName === undefined) {
-      delete dataToUpdate.ownerName;
-  }
+  
+  // Clean up any undefined fields before sending to Firestore
+  Object.keys(dataToUpdate).forEach(key => {
+      const typedKey = key as keyof typeof dataToUpdate;
+      if (dataToUpdate[typedKey] === undefined) {
+          delete dataToUpdate[typedKey];
+      }
+  });
 
   await updateDoc(docRef, {
       ...dataToUpdate,
@@ -692,4 +680,13 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         deviceSessions,
         referrals,
     };
+}
+
+
+// --- Account Recovery ---
+export async function saveRecoveryKeyHash(userId: string, secretKey: string): Promise<void> {
+  const userDocRef = doc(db, 'users', userId);
+  const keyHash = sha256(secretKey);
+  // Use set with merge to create the doc if it doesn't exist, or update if it does.
+  await setDoc(userDocRef, { recoveryKeyHash: keyHash }, { merge: true });
 }
