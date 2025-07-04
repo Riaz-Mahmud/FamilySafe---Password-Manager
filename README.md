@@ -2,8 +2,6 @@
 
 FamilySafe is a modern, secure, and feature-rich password manager designed for families and individuals. Built with a focus on security and ease of use, it helps you manage your digital life safely. This application was built using Next.js, React, Firebase, and ShadCN UI.
 
-*(Note: Replace the placeholder images below with actual screenshots of your application.)*
-
 <p align="center">
   <img alt="Dashboard View" src="https://placehold.co/1200x800.png" data-ai-hint="dashboard application" />
   <br/>
@@ -172,7 +170,62 @@ Some areas we're particularly interested in exploring:
 -   **Enhanced Testing**: Improve our test coverage with more unit, integration, and end-to-end tests.
 -   **CI/CD Workflow Improvements**: Help streamline our development and deployment pipeline.
 
-If you have an idea for a feature or find a bug, please open an issue to start the conversation.
+### Advanced Contribution Idea: "Digital DNA" Behavioral Biometrics
+
+This is a proposal for a sophisticated, privacy-first identity recovery system using behavioral biometrics as a fallback verification method.
+
+#### 🔐 Purpose:
+To create a secure identity recovery path for users who have lost their master password AND their recovery kit, by verifying their identity through unique behavioral patterns.
+
+#### 💡 Core Concept:
+The system continuously and passively learns a user's unique patterns—such as typing rhythm, mouse movement, and navigation habits—to create a "behavioral fingerprint." This fingerprint is stored in an encrypted state and can be used to verify the user's identity with a certain confidence level during a recovery attempt.
+
+#### 🏛️ Proposed Architecture & Firebase Implementation
+
+This architecture is designed to be privacy-first, adhering to the zero-knowledge principles of the app.
+
+**Phase 1: Behavioral Data Collection (Client-Side)**
+-   **What:** Capture raw behavioral data using JavaScript event listeners.
+    -   **Typing Rhythm:** Record timestamps and keycodes for `keydown` and `keyup` events. Analyze metrics like flight time (time between releasing one key and pressing the next) and dwell time (time a key is held down).
+    -   **Mouse/Touch Dynamics:** Track mouse velocity, acceleration, click patterns, and touch gesture paths (`touchstart`, `touchmove`, `touchend`).
+    -   **Navigation Patterns:** Log sequences of UI interactions (e.g., time spent on `Settings` page vs. `Passwords` page).
+-   **Privacy:** This raw data is highly sensitive and **must never leave the user's device**. It is used only for the next phase.
+
+**Phase 2: On-Device Profile Generation (Client-Side)**
+-   **What:** The raw behavioral data is processed on-device into an abstract statistical model—the "behavioral fingerprint." This is not the raw data itself, but a mathematical representation (e.g., a vector of means, standard deviations, and other statistical moments).
+-   **Tools:**
+    -   **TensorFlow.js (TFLite for Web):** A lightweight on-device ML library can be trained to create a robust user model. The app would collect data passively and, once enough is gathered, train or update a small model locally in the browser.
+    -   **Custom Logic:** Alternatively, a non-ML statistical model can be created by calculating and storing key metrics.
+-   **Privacy:** The training and processing happen entirely in the user's browser. The server never sees the raw behavioral data.
+
+**Phase 3: Secure Fingerprint Storage (Client-Side Encryption -> Firestore)**
+-   **What:** The generated behavioral fingerprint (the abstract model) is encrypted using the user's unique encryption key (the same one used for passwords, derived from their master password).
+-   **Tools:**
+    -   **`crypto.ts`:** Use the existing `encryptData` function.
+    -   **Firestore:** The encrypted fingerprint is stored in a dedicated document in the user's private Firestore collection (e.g., `/users/{uid}/behavioral_fingerprints/{deviceId}`). Storing it per-device allows for device-specific patterns.
+-   **Privacy:** The server only ever stores an encrypted blob that it cannot read, maintaining the zero-knowledge principle.
+
+**Phase 4: Identity Verification During Recovery (Client + Firebase Functions)**
+-   **Flow:**
+    1.  User starts a recovery flow and is prompted to perform a series of actions (e.g., "Type the following sentence," "Move your mouse to the target").
+    2.  A **live behavioral fingerprint** is generated on-device from these actions.
+    3.  The app fetches the **encrypted stored fingerprint** from Firestore.
+    4.  The user is prompted for their master password. This is **only** used locally to decrypt the stored fingerprint. *If the user has forgotten it, this system cannot work as a standalone.* It's best used as a *secondary* factor alongside a weakened-but-not-forgotten password or another factor.
+    5.  Both the live fingerprint and the now-decrypted stored fingerprint (both abstract models, not raw data) are sent to a secure Firebase Function.
+-   **Tools:**
+    -   **Firebase Functions:** The Function receives the two abstract fingerprints. Its sole job is to run a comparison algorithm (e.g., cosine similarity, Euclidean distance) and return a confidence score (0-100). The comparison logic is kept on the server to prevent it from being reverse-engineered on the client.
+    -   **Firebase App Check:** This is **critical**. The Firebase Function must be protected with App Check to ensure that only legitimate instances of your app can request a comparison. This prevents replay attacks and abuse of the verification endpoint.
+-   **Result:** Based on the confidence score returned by the Function, the app can decide to either grant access or trigger another verification step (like the secret recovery key).
+
+#### 🤝 How to Contribute
+Developing this feature would involve:
+-   Researching and implementing lightweight data capture scripts for typing and mouse dynamics.
+-   Designing a robust statistical model for the behavioral fingerprint.
+-   Integrating TensorFlow.js for on-device model training and inference.
+-   Building the secure Firebase Function for fingerprint comparison.
+-   Designing the UI/UX for the data collection and recovery challenge phases.
+
+If you have expertise in machine learning, browser security, and front-end development, this is a challenging and rewarding feature to lead.
 
 ## Contributors
 
