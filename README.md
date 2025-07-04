@@ -162,6 +162,11 @@ We welcome contributions from the community! Whether you're a developer, designe
 
 Some areas we're particularly interested in exploring:
 -   **Browser Extension**: Build a browser extension for autofilling credentials. This would be the foundation for features like **Smart Sync**, which could suggest saving passwords for frequently visited sites by analyzing local browser history securely.
+-   **Memory Vault - Generational Memory Keeper**: A major feature focused on securely preserving life memories and digital family history. This would create a living, encrypted digital heirloom for future generations. Core concepts include:
+    -   **Legacy Messaging**: Secure, time-locked audio or text messages to be delivered to loved ones in the future.
+    -   **Advice Capsules**: Encrypted notes attached to life milestones (e.g., "When you go to college, read this").
+    -   **Story Cards**: Structured templates to share family origin stories with photos and values.
+    -   **Family Time Capsule**: Configure memories to unlock on specific future dates.
 -   **Localization & Internationalization**: Help make FamilySafe accessible to a global audience.
 -   **Third-Party Integrations**: Develop a plugin or extension system for integrating with other services.
 -   **Enhanced Testing**: Improve our test coverage with more unit, integration, and end-to-end tests.
