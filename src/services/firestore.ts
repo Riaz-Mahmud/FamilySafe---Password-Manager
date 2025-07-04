@@ -5,6 +5,7 @@
 
 
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
 import {
