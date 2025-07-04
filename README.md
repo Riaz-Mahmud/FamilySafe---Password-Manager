@@ -168,3 +168,19 @@ Some areas we're particularly interested in exploring:
 -   **CI/CD Workflow Improvements**: Help streamline our development and deployment pipeline.
 
 If you have an idea for a feature or find a bug, please open an issue to start the conversation.
+
+## Contributors
+
+A special thanks to the following people who have contributed to this project:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/Riaz-Mahmud">
+        <img src="https://github.com/Riaz-Mahmud.png?size=100" width="100px;" alt="Riaz Mahmud" style="border-radius: 50%;"/>
+        <br />
+        <sub><b>Riaz Mahmud</b></sub>
+      </a>
+    </td>
+  </tr>
+</table>
