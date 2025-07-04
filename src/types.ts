@@ -63,3 +63,18 @@ export interface SecureDocument {
   ownerId?: string;
   ownerName?: string;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: 'share_credential' | 'share_document' | 'welcome' | 'info';
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: Date;
+  link?: string;
+  from?: {
+    name: string;
+    avatar?: string;
+  };
+}

@@ -38,7 +38,6 @@ import {
   Trash,
   GanttChartSquare,
   BadgeInfo,
-  Inbox,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -46,7 +45,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -82,6 +81,10 @@ import {
   getVaults,
   deleteVault,
   addSharedItem,
+  getNotifications,
+  addNotification,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -100,6 +103,7 @@ import { SecureDocumentList } from '@/components/dashboard/secure-document-list'
 import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-document-preview-dialog';
 import { AddVaultDialog } from '@/components/dashboard/add-vault-dialog';
 import { encryptData } from '@/lib/crypto';
+import { NotificationsPopover } from '@/components/dashboard/notifications-popover';
 
 
 export default function DashboardPage() {
@@ -112,6 +116,7 @@ export default function DashboardPage() {
   const [allOwnedDocuments, setAllOwnedDocuments] = useState<SecureDocument[]>([]);
   const [allSharedCredentials, setAllSharedCredentials] = useState<Credential[]>([]);
   const [allSharedDocuments, setAllSharedDocuments] = useState<SecureDocument[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -172,6 +177,7 @@ export default function DashboardPage() {
       setFamilyMembers([]);
       setAuditLogs([]);
       setDeviceSessions([]);
+      setNotifications([]);
       return;
     }
 
@@ -179,11 +185,13 @@ export default function DashboardPage() {
     const unsubscribeAuditLogs = getAuditLogs(user.uid, setAuditLogs);
     const currentSessionId = localStorage.getItem('sessionId');
     const unsubscribeSessions = getDeviceSessions(user.uid, currentSessionId, setDeviceSessions);
+    const unsubscribeNotifications = getNotifications(user.uid, setNotifications);
 
     return () => {
       unsubscribeFamilyMembers();
       unsubscribeAuditLogs();
       unsubscribeSessions();
+      unsubscribeNotifications();
     };
   }, [user?.uid]);
   
@@ -198,8 +206,18 @@ export default function DashboardPage() {
     const unsubscribe = getVaults(user.uid, async (fetchedVaults) => {
       if (fetchedVaults.length === 0 && !authLoading) {
         // This is a new user, create a personal vault for them
-        await createVault(user.uid, 'Personal');
-        // The listener will pick up the new vault, no need to set state here.
+        const newVaultId = await createVault(user.uid, 'Personal');
+        // Add a welcome notification for the new user
+        await addNotification(user.uid, {
+          userId: user.uid,
+          type: 'welcome',
+          title: 'Welcome to FamilySafe!',
+          message: 'Click "Add Credential" to save your first password.',
+          link: '/',
+          read: false,
+          createdAt: new Date()
+        });
+        // The listener will pick up the new vault, so no need to set state here.
       } else {
         setVaults(fetchedVaults);
         if (!selectedVaultId && fetchedVaults.length > 0) {
@@ -316,6 +334,19 @@ export default function DashboardPage() {
       
       try {
         await addSharedItem(recipient.uid, itemType, encryptedForRecipient);
+        await addNotification(recipient.uid, {
+            userId: recipient.uid,
+            type: itemType === 'credential' ? 'share_credential' : 'share_document',
+            title: `New ${itemType} shared`,
+            message: `${user.displayName || user.email} shared "${itemData.name || itemData.url}" with you.`,
+            link: itemType === 'credential' ? '/?activeMenu=Shared%20Passwords' : '/?activeMenu=Shared%20Documents',
+            from: {
+                name: user.displayName || user.email || 'A User',
+                avatar: user.photoURL || undefined
+            },
+            read: false,
+            createdAt: new Date(),
+        });
         sharedCount++;
       } catch (error) {
         console.error(`Failed to share with ${recipient.name}`, error);
@@ -572,6 +603,15 @@ export default function DashboardPage() {
     }
   };
 
+  const handleMarkNotificationAsRead = async (notificationId: string) => {
+    if (!user) return;
+    await markNotificationAsRead(user.uid, notificationId);
+  };
+
+  const handleMarkAllNotificationsAsRead = async () => {
+      if (!user) return;
+      await markAllNotificationsAsRead(user.uid);
+  };
 
   const openAddPasswordDialog = () => {
     setEditingCredential(null);
@@ -980,22 +1020,35 @@ export default function DashboardPage() {
             <SidebarTrigger className="md:hidden" />
             
             {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') || activeMenu.includes('Shared') || activeMenu === 'SharedWithFamilyMember' ? (
-              <>
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    placeholder={
-                        activeMenu === 'SharedWithFamilyMember' && selectedFamilyMember 
-                        ? `Search items shared with ${selectedFamilyMember.name}...`
-                        : activeMenu.includes('Shared') ? "Search shared items..." : "Search this vault..."
-                    }
-                    className="pl-10 w-full max-w-sm"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    disabled={!selectedVaultId && !activeMenu.includes('Shared') && activeMenu !== 'SharedWithFamilyMember'}
-                  />
-                </div>
-                 {activeMenu !== 'SharedWithFamilyMember' && (
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  placeholder={
+                      activeMenu === 'SharedWithFamilyMember' && selectedFamilyMember 
+                      ? `Search items shared with ${selectedFamilyMember.name}...`
+                      : activeMenu.includes('Shared') ? "Search shared items..." : "Search this vault..."
+                  }
+                  className="pl-10 w-full max-w-sm"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={!selectedVaultId && !activeMenu.includes('Shared') && activeMenu !== 'SharedWithFamilyMember'}
+                />
+              </div>
+            ) : <div className="flex-1" />}
+
+            <div className="flex items-center gap-2">
+                <NotificationsPopover
+                    notifications={notifications}
+                    onMarkAsRead={handleMarkNotificationAsRead}
+                    onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+                />
+                {activeMenu === 'Family Members' ? (
+                    <Button onClick={openAddFamilyMemberDialog} className="font-semibold">
+                        <Plus className="h-5 w-5 md:mr-2" />
+                        <span className="hidden md:inline">Add Family Member</span>
+                    </Button>
+                ) : activeMenu !== 'SharedWithFamilyMember' &&
+                   !['Password Health Report', 'Audit Logs', 'Device Management', 'Settings', 'Support'].includes(activeMenu) ? (
                     <>
                         <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents' || activeMenu.includes('Shared')}>
                           <Plus className="h-5 w-5 md:mr-2" />
@@ -1006,17 +1059,8 @@ export default function DashboardPage() {
                           <span className="hidden md:inline">Add Document</span>
                         </Button>
                     </>
-                 )}
-              </>
-            ) : activeMenu === 'Family Members' ? (
-              <>
-                <div className="flex-1" />
-                <Button onClick={openAddFamilyMemberDialog} className="font-semibold">
-                  <Plus className="h-5 w-5 md:mr-2" />
-                  <span className="hidden md:inline">Add Family Member</span>
-                </Button>
-              </>
-            ) : <div className="flex-1" />}
+                 ) : null}
+            </div>
           </header>
 
           <main className="flex-1 overflow-y-auto">
@@ -1156,4 +1200,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-

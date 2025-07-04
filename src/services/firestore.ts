@@ -2,8 +2,9 @@
 
 
 
+
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
 import {
   collection,
   addDoc,
@@ -574,7 +575,7 @@ export async function deleteUserData(userId: string): Promise<void> {
   }
   
   // Delete all subcollections under the user's document.
-  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments', 'vaults'];
+  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments', 'vaults', 'notifications'];
   const deleteSubCollectionPromises = subcollections.map(sub => deleteCollection(`users/${userId}/${sub}`));
   await Promise.all(deleteSubCollectionPromises);
 
@@ -594,8 +595,9 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const referralsCol = collection(db, 'users', userId, 'successful_referrals');
     const secureDocumentsCol = collection(db, 'users', userId, 'secureDocuments');
     const vaultsCol = collection(db, 'users', userId, 'vaults');
+    const notificationsCol = collection(db, 'users', userId, 'notifications');
 
-    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap] = await Promise.all([
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap, notificationsSnap] = await Promise.all([
         getDocs(query(credentialsCol)),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
@@ -603,6 +605,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         getDocs(query(referralsCol, orderBy('timestamp', 'desc'))),
         getDocs(query(secureDocumentsCol)),
         getDocs(query(vaultsCol, orderBy('name'))),
+        getDocs(query(notificationsCol, orderBy('createdAt', 'desc'))),
     ]);
 
     const credentials = credentialsSnap.docs.map(doc => {
@@ -670,6 +673,15 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     });
 
     const vaults = vaultsSnap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+    const notifications = notificationsSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: formatTimestamp(data.createdAt),
+        };
+    });
     
     return {
         vaults,
@@ -679,6 +691,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         auditLogs,
         deviceSessions,
         referrals,
+        notifications,
     };
 }
 
@@ -700,4 +713,55 @@ export async function checkRecoveryKeyExists(userId: string): Promise<boolean> {
     console.error("Error checking for recovery key:", error);
     return false;
   }
+}
+
+// --- Notifications ---
+export async function addNotification(userId: string, data: Omit<Notification, 'id'>): Promise<void> {
+    const notificationsCol = collection(db, 'users', userId, 'notifications');
+    await addDoc(notificationsCol, {
+        ...data,
+        createdAt: serverTimestamp(), // Use server timestamp for consistency
+        read: false,
+    });
+}
+
+export function getNotifications(userId: string, callback: (notifications: Notification[]) => void): () => void {
+    const notificationsCol = collection(db, 'users', userId, 'notifications');
+    const q = query(notificationsCol, orderBy('createdAt', 'desc'), limit(50));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const notifications = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate(),
+            } as Notification;
+        });
+        callback(notifications);
+    }, (error) => {
+        console.error("Error fetching notifications:", error);
+        callback([]);
+    });
+
+    return unsubscribe;
+}
+
+export async function markNotificationAsRead(userId: string, notificationId: string): Promise<void> {
+    const notificationRef = doc(db, 'users', userId, 'notifications', notificationId);
+    await updateDoc(notificationRef, { read: true });
+}
+
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+    const notificationsCol = collection(db, 'users', userId, 'notifications');
+    const q = query(notificationsCol, where('read', '==', false));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { read: true });
+    });
+    await batch.commit();
 }
