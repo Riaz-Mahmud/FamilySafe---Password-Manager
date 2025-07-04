@@ -514,7 +514,7 @@ export default function DashboardPage() {
         });
       } catch (error) {
         console.error("Error deleting document:", error);
-        toast({ title: 'Error', description: 'Failed to delete document.', variant: 'destructive' });
+        toast({ title: 'Error', description: 'Failed to delete secure document.', variant: 'destructive' });
       } finally {
         setDeleteDocumentTargetId(null);
       }
