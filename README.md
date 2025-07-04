@@ -1,21 +1,37 @@
-# FamilySafe - Secure Password Manager
+# FamilySafe - Secure Password & Document Manager
 
 FamilySafe is a modern, secure, and feature-rich password manager designed for families and individuals. Built with a focus on security and ease of use, it helps you manage your digital life safely. This application was built using Next.js, React, Firebase, and ShadCN UI.
 
+*(Note: Replace the placeholder images below with actual screenshots of your application.)*
+
+<p align="center">
+  <img alt="Dashboard View" src="https://placehold.co/1200x800.png" data-ai-hint="dashboard application" />
+  <br/>
+  <em>The main dashboard, showing vaults, credentials, and documents.</em>
+</p>
+
+<p align="center">
+  <img alt="Add Credential Dialog" src="https://placehold.co/800x600.png" data-ai-hint="dialog form" />
+  <br/>
+  <em>Adding a new credential with options for expiry reminders, travel safety, and sharing.</em>
+</p>
+
+
 ## Key Features
 
--   **Secure Credential Management**: Easily add, edit, and delete login credentials for all your websites and applications.
--   **End-to-End Encryption**: Your sensitive data (usernames, passwords, notes) is encrypted on your device using AES-256 before being stored, ensuring only you can access it.
--   **Credential Tagging and Search**: Add custom tags (e.g., "bank", "work") to your credentials and use the powerful search to filter by site, username, or tag.
--   **Password Sharing**: Securely share specific credentials with family members you've added to your group. Click on a family member to see all passwords shared with them.
--   **Password Health Report**: Proactively improve your security with a comprehensive report that identifies weak, reused, or compromised passwords using the 'Have I Been Pwned' service securely.
--   **Device Management**: View all devices that have logged into your account and remotely revoke access from any session you don't recognize or trust.
--   **Audit Logs**: Keep track of all important activities in your account, including sign-ins, credential changes, and family member updates.
+-   **Vault Management**: Organize your credentials and secure documents into separate, encrypted vaults (e.g., "Personal", "Work", "Finances").
+-   **Secure Credential & Document Storage**: Easily add, edit, and delete login credentials and sensitive files. All data is encrypted client-side.
+-   **End-to-End Encryption**: Your sensitive data is encrypted on your device using AES-256 before being stored, ensuring only you can access it.
+-   **Secure Sharing**: Securely share specific credentials or documents with family members. Deleting an item you own automatically revokes access for everyone it was shared with.
+-   **Password Health Report**: Proactively improve your security with a comprehensive report that identifies weak, reused, or compromised passwords.
+-   **Travel Mode**: A special mode that hides all credentials except those you've specifically marked as "Safe for Travel", providing peace of mind when crossing borders.
+-   **Password Expiry Reminders**: Set rotation reminders for your passwords (e.g., every 3, 6, or 12 months) and get visual alerts when they're about to expire.
+-   **Real-time Notifications**: Receive in-app notifications for important events, like when an item is shared with you.
+-   **Device Management**: View all devices that have logged into your account and remotely revoke access from any session you don't recognize.
+-   **Account Recovery Kit**: Generate a secure, one-time recovery kit with a secret key to regain access to your account if you forget your master password.
+-   **Audit Logs**: Keep track of all important activities in your account, including sign-ins, credential changes, and sharing events.
 -   **Data Export & Deletion**: In compliance with privacy regulations like GDPR & CCPA, you can export all your data or permanently delete your account.
--   **Family Group Management**: Add or remove family members to control who you can share credentials with.
--   **Settings & Profile Management**: Update your display name and manage your account security, including requesting password resets.
--   **Support & FAQ**: Get help with common questions and contact support directly through the app.
--   **Responsive Design**: A seamless experience across all your devices, from desktop to mobile.
+-   **Family Group Management**: Add or remove family members to control who you can share items with.
 
 ## Zero-Knowledge Encryption Architecture
 
@@ -109,7 +125,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
 FIREBASE_CLIENT_EMAIL=your_firebase_client_email_from_service_account_json
 FIREBASE_PRIVATE_KEY=your_firebase_private_key_from_service_account_json
 
-# SendGrid Configuration (for sending credentials via email)
+# SendGrid Configuration (for sending emails)
 # Create an API key in your SendGrid dashboard
 SENDGRID_API_KEY=your_sendgrid_api_key
 # This must be a verified sender identity in your SendGrid account
@@ -142,4 +158,13 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Contributing
 
-We’re looking for contributions in areas like localization and internationalization, building a browser extension for autofilling credentials that could also enable **smart sync with browser history** (suggesting passwords for frequently visited but unsecured sites). We're also interested in developing a plugin or extension system for third-party integrations, creating a secure CLI tool or API wrapper, improving our test coverage with unit and end-to-end testing, enhancing our CI/CD workflows, and designing a privacy-first analytics dashboard for credential health and usage insights. Whether you're a frontend developer, backend engineer, security enthusiast, or first-time open-source contributor, there’s a place for you in the FamilySafe project!
+We welcome contributions from the community! Whether you're a developer, designer, or security enthusiast, there’s a place for you in the FamilySafe project.
+
+Some areas we're particularly interested in exploring:
+-   **Browser Extension**: Build a browser extension for autofilling credentials. This would be the foundation for features like **Smart Sync**, which could suggest saving passwords for frequently visited sites by analyzing local browser history securely.
+-   **Localization & Internationalization**: Help make FamilySafe accessible to a global audience.
+-   **Third-Party Integrations**: Develop a plugin or extension system for integrating with other services.
+-   **Enhanced Testing**: Improve our test coverage with more unit, integration, and end-to-end tests.
+-   **CI/CD Workflow Improvements**: Help streamline our development and deployment pipeline.
+
+If you have an idea for a feature or find a bug, please open an issue to start the conversation.
