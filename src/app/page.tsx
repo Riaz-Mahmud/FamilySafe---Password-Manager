@@ -110,6 +110,7 @@ import { encryptData } from '@/lib/crypto';
 import { NotificationsPopover } from '@/components/dashboard/notifications-popover';
 import { AddMemoryDialog } from '@/components/dashboard/add-memory-dialog';
 import { MemoryList } from '@/components/dashboard/memory-list';
+import { MemoryPreviewDialog } from '@/components/dashboard/memory-preview-dialog';
 
 
 export default function DashboardPage() {
@@ -147,6 +148,7 @@ export default function DashboardPage() {
   const [isAddVaultDialogOpen, setAddVaultDialogOpen] = useState(false);
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
   const [isPreviewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [isMemoryPreviewOpen, setMemoryPreviewOpen] = useState(false);
   
   // Editing and Deleting state
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
@@ -162,6 +164,7 @@ export default function DashboardPage() {
   // Data to pass to dialogs
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const [documentToPreview, setDocumentToPreview] = useState<SecureDocument | null>(null);
+  const [memoryToPreview, setMemoryToPreview] = useState<Memory | null>(null);
 
   const { toast } = useToast();
 
@@ -792,6 +795,16 @@ export default function DashboardPage() {
     setPreviewDialogOpen(open);
   };
 
+  const openMemoryPreviewDialog = (memory: Memory) => {
+    setMemoryToPreview(memory);
+    setMemoryPreviewOpen(true);
+  };
+
+  const handleMemoryPreviewDialogChange = (open: boolean) => {
+    if (!open) setMemoryToPreview(null);
+    setMemoryPreviewOpen(open);
+  };
+
   const openAddFamilyMemberDialog = () => {
     setEditingFamilyMember(null);
     setAddFamilyMemberDialogOpen(true);
@@ -915,6 +928,7 @@ export default function DashboardPage() {
                 memories={filteredMemories}
                 onEdit={openEditMemoryDialog}
                 onDelete={setDeleteMemoryTargetId}
+                onPreview={openMemoryPreviewDialog}
             />
           </div>
         );
@@ -943,6 +957,7 @@ export default function DashboardPage() {
                 memories={filteredMemories}
                 onEdit={openEditMemoryDialog}
                 onDelete={setDeleteMemoryTargetId}
+                onPreview={openMemoryPreviewDialog}
             />
         );
        case 'Shared Passwords':
@@ -969,6 +984,7 @@ export default function DashboardPage() {
                 memories={filteredMemories}
                 onEdit={openEditMemoryDialog}
                 onDelete={setDeleteMemoryTargetId}
+                onPreview={openMemoryPreviewDialog}
             />
         );
       case 'Family Members':
@@ -1046,6 +1062,7 @@ export default function DashboardPage() {
                 memories={filteredCombinedMemories}
                 onEdit={openEditMemoryDialog}
                 onDelete={setDeleteMemoryTargetId}
+                onPreview={openMemoryPreviewDialog}
             />}
           </div>
         );
@@ -1341,6 +1358,12 @@ export default function DashboardPage() {
         open={isPreviewDialogOpen}
         onOpenChange={handlePreviewDialogChange}
         document={documentToPreview}
+      />
+
+      <MemoryPreviewDialog
+        open={isMemoryPreviewOpen}
+        onOpenChange={handleMemoryPreviewDialogChange}
+        memory={memoryToPreview}
       />
 
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>

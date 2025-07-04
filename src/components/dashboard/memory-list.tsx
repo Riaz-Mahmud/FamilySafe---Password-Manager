@@ -1,8 +1,8 @@
 
+
 'use client';
 
 import type { Memory } from '@/types';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Edit, Trash2, Album } from 'lucide-react';
@@ -13,9 +13,10 @@ type MemoryListProps = {
   memories: Memory[];
   onEdit: (memory: Memory) => void;
   onDelete: (id: string) => void;
+  onPreview: (memory: Memory) => void;
 };
 
-export function MemoryList({ memories, onEdit, onDelete }: MemoryListProps) {
+export function MemoryList({ memories, onEdit, onDelete, onPreview }: MemoryListProps) {
   if (memories.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
@@ -31,7 +32,7 @@ export function MemoryList({ memories, onEdit, onDelete }: MemoryListProps) {
   const renderOwnership = (memory: Memory) => {
     if (!memory.ownerName) return null;
     return (
-        <div className="absolute top-2 left-2">
+        <div className="absolute top-2 left-2 z-10">
             <Badge variant="secondary" className="font-normal text-xs">Shared by {memory.ownerName}</Badge>
         </div>
     );
@@ -40,14 +41,17 @@ export function MemoryList({ memories, onEdit, onDelete }: MemoryListProps) {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {memories.map(memory => (
-        <Card key={memory.id} className="flex flex-col overflow-hidden">
-            <div className="relative aspect-video bg-muted">
+        <Card key={memory.id} className="flex flex-col overflow-hidden group/memory-card">
+            <div 
+              className="relative aspect-video bg-muted cursor-pointer"
+              onClick={() => onPreview(memory)}
+            >
                 {memory.photoUrl ? (
                     <Image
                         src={memory.photoUrl}
                         alt={memory.title}
                         fill
-                        className="object-cover"
+                        className="object-cover transition-transform duration-300 group-hover/memory-card:scale-105"
                     />
                 ) : (
                     <div className="flex items-center justify-center h-full">
@@ -56,7 +60,10 @@ export function MemoryList({ memories, onEdit, onDelete }: MemoryListProps) {
                 )}
                 {renderOwnership(memory)}
             </div>
-            <CardContent className="p-4 flex flex-col flex-grow">
+            <CardContent 
+              className="p-4 flex flex-col flex-grow cursor-pointer"
+              onClick={() => onPreview(memory)}
+            >
                 <p className="text-sm text-muted-foreground">{new Date(memory.memoryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</p>
                 <h3 className="font-semibold text-lg flex-grow mt-1">{memory.title}</h3>
                 {memory.tags?.length > 0 && (
