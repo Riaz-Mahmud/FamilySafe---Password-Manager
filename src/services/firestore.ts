@@ -4,6 +4,7 @@
 
 
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
 import {
@@ -558,41 +559,6 @@ export async function deleteSecureDocument(userId: string, id: string): Promise<
   batch.delete(docRef);
 
   await batch.commit();
-}
-
-// --- Sharing ---
-
-export async function addSharedItem(recipientUid: string, itemType: 'credential' | 'document', itemData: any): Promise<void> {
-    const personalVault = await getOrCreatePersonalVault(recipientUid);
-    const collectionName = itemType === 'credential' ? 'credentials' : 'secureDocuments';
-    const itemsCol = collection(db, 'users', recipientUid, collectionName);
-    
-    const { originalId } = itemData;
-
-    if (!originalId) {
-      console.error("Attempted to share an item without an originalId.", itemData);
-      return;
-    }
-        
-    const q = query(itemsCol, where('originalId', '==', originalId), limit(1));
-    const existingDocs = await getDocs(q);
-    
-    const dataPayload = {
-        ...itemData,
-        vaultId: personalVault.id,
-        lastModified: serverTimestamp(),
-    };
-
-    if (!existingDocs.empty) {
-        const existingDocRef = existingDocs.docs[0].ref;
-        delete dataPayload.createdAt;
-        await updateDoc(existingDocRef, dataPayload);
-    } else {
-        await addDoc(itemsCol, {
-            ...dataPayload,
-            createdAt: serverTimestamp(),
-        });
-    }
 }
 
 // --- Referrals & Invitations ---

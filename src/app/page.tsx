@@ -80,7 +80,6 @@ import {
   createVault,
   getVaults,
   deleteVault,
-  addSharedItem,
   getNotifications,
   addNotification,
   markNotificationAsRead,
@@ -97,7 +96,7 @@ import { AuditLogsPage } from '@/components/dashboard/audit-logs-page';
 import { DeviceManagementPage } from '@/components/dashboard/device-management-page';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { sendInvitationEmailAction } from '@/app/actions';
+import { sendInvitationEmailAction, shareItemAction } from '@/app/actions';
 import { AddSecureDocumentDialog } from '@/components/dashboard/add-secure-document-dialog';
 import { SecureDocumentList } from '@/components/dashboard/secure-document-list';
 import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-document-preview-dialog';
@@ -304,66 +303,94 @@ export default function DashboardPage() {
   };
   
   const handleShareItem = async (
-    itemData: any, 
-    itemType: 'credential' | 'document', 
+    itemData: any,
+    itemType: 'credential' | 'document',
     recipients: FamilyMember[]
   ) => {
     if (!user) return;
-    
+
     let sharedCount = 0;
     for (const recipient of recipients) {
-      if (!recipient.uid) continue;
+      if (!recipient.uid || recipient.status !== 'active') {
+        toast({
+          title: 'Sharing Skipped',
+          description: `Cannot share with ${recipient.name} as their account is not active. They need to sign up first.`,
+          variant: 'destructive',
+          duration: 8000,
+        });
+        continue;
+      }
 
+      // Prepare data for sharing
       let encryptedForRecipient;
-      const baseData = { 
-          ...itemData, 
-          originalId: itemData.id, 
-          ownerId: user.uid, 
-          ownerName: user.displayName || user.email 
+      const baseData = {
+        ...itemData,
+        originalId: itemData.id,
+        ownerId: user.uid,
+        ownerName: user.displayName || user.email,
       };
-      delete baseData.id; // remove original id, firestore will generate a new one
-      delete baseData.sharedWith; // The recipient doesn't need the full share list
-      
+      delete baseData.id;
+      delete baseData.sharedWith;
+
+      // Encrypt data with recipient's key (their UID)
       if (itemType === 'credential') {
         encryptedForRecipient = {
-            ...baseData,
-            username: encryptData(baseData.username, recipient.uid),
-            password: encryptData(baseData.password, recipient.uid),
-            notes: encryptData(baseData.notes || '', recipient.uid),
+          ...baseData,
+          username: encryptData(baseData.username, recipient.uid),
+          password: encryptData(baseData.password, recipient.uid),
+          notes: encryptData(baseData.notes || '', recipient.uid),
         };
       } else { // document
         encryptedForRecipient = {
-            ...baseData,
-            notes: encryptData(baseData.notes || '', recipient.uid),
-            fileDataUrl: encryptData(baseData.fileDataUrl, recipient.uid),
+          ...baseData,
+          notes: encryptData(baseData.notes || '', recipient.uid),
+          fileDataUrl: encryptData(baseData.fileDataUrl, recipient.uid),
         };
       }
-      
+
       try {
-        await addSharedItem(recipient.uid, itemType, encryptedForRecipient);
-        await addNotification(recipient.uid, {
-            userId: recipient.uid,
-            type: itemType === 'credential' ? 'share_credential' : 'share_document',
-            title: `New ${itemType} shared`,
-            message: `${user.displayName || user.email} shared "${itemData.name || itemData.url}" with you.`,
-            link: itemType === 'credential' ? '/?activeMenu=Shared%20Passwords' : '/?activeMenu=Shared%20Documents',
-            from: {
-                name: user.displayName || user.email || 'A User',
-                avatar: user.photoURL || undefined
-            },
-            read: false,
-            createdAt: new Date(),
+        // Prepare notification data
+        const notificationData = {
+          userId: recipient.uid,
+          type: itemType === 'credential' ? 'share_credential' : 'share_document',
+          title: `New ${itemType} shared`,
+          message: `${user.displayName || user.email} shared "${itemData.name || itemData.url}" with you.`,
+          link: itemType === 'credential' ? '/?activeMenu=Shared%20Passwords' : '/?activeMenu=Shared%20Documents',
+          from: {
+            name: user.displayName || user.email || 'A User',
+            avatar: user.photoURL || undefined,
+          },
+        };
+
+        // Use the new server action
+        const result = await shareItemAction({
+          recipientUid: recipient.uid,
+          itemType,
+          itemData: encryptedForRecipient,
+          notificationData: notificationData,
         });
+
+        if (!result.success) {
+          throw new Error(result.message);
+        }
+
         sharedCount++;
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to share with ${recipient.name}`, error);
-        toast({ title: 'Sharing Error', description: `Could not share with ${recipient.name}.`, variant: 'destructive' });
+        toast({
+          title: 'Sharing Error',
+          description: error.message || `Could not share with ${recipient.name}.`,
+          variant: 'destructive',
+        });
       }
     }
-    
+
     if (sharedCount > 0) {
       const itemTypeName = itemType === 'credential' ? 'Credential' : 'Document';
-      toast({ title: 'Shared Successfully', description: `${itemTypeName} shared with ${sharedCount} member(s).` });
+      toast({
+        title: 'Shared Successfully',
+        description: `${itemTypeName} shared with ${sharedCount} member(s).`,
+      });
     }
   };
 

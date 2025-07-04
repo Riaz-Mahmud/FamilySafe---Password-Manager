@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
 import { sendInvitationEmail } from '@/ai/flows/send-invitation-email-flow';
 import { recoverAccount } from '@/services/recovery';
+import { shareItemAndNotify } from '@/services/sharing';
 
 const SendEmailSchema = z.object({
   emails: z.array(z.string().email()),
@@ -88,4 +89,27 @@ export async function recoverAccountAction(data: z.infer<typeof RecoverAccountSc
       message: 'An unexpected error occurred while processing your request.' 
     };
   }
+}
+
+const ShareItemServerSchema = z.object({
+  recipientUid: z.string(),
+  itemType: z.enum(['credential', 'document']),
+  itemData: z.any(),
+  notificationData: z.any(),
+});
+
+export async function shareItemAction(data: z.infer<typeof ShareItemServerSchema>) {
+    try {
+        const parsedData = ShareItemServerSchema.safeParse(data);
+        if (!parsedData.success) {
+            return { success: false, message: 'Invalid input for sharing.' };
+        }
+        return await shareItemAndNotify(parsedData.data);
+    } catch (error: any) {
+        console.error('Error in shareItemAction:', error);
+        return { 
+            success: false, 
+            message: 'An unexpected error occurred while sharing.' 
+        };
+    }
 }
