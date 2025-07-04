@@ -22,6 +22,7 @@ export interface Credential {
   sharedWith: string[];
   ownerId?: string;
   ownerName?: string;
+  originalId?: string;
 }
 
 export interface FamilyMember {
@@ -62,6 +63,7 @@ export interface SecureDocument {
   sharedWith: string[];
   ownerId?: string;
   ownerName?: string;
+  originalId?: string;
 }
 
 export interface Notification {

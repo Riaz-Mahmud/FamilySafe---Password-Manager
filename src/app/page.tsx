@@ -315,7 +315,14 @@ export default function DashboardPage() {
       if (!recipient.uid) continue;
 
       let encryptedForRecipient;
-      const baseData = { ...itemData, ownerId: user.uid, ownerName: user.displayName || user.email };
+      const baseData = { 
+          ...itemData, 
+          originalId: itemData.id, 
+          ownerId: user.uid, 
+          ownerName: user.displayName || user.email 
+      };
+      delete baseData.id; // remove original id, firestore will generate a new one
+      delete baseData.sharedWith; // The recipient doesn't need the full share list
       
       if (itemType === 'credential') {
         encryptedForRecipient = {
@@ -365,7 +372,7 @@ export default function DashboardPage() {
   const handleAddCredential = async (newCredential: Omit<Credential, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => {
     if(!user || !selectedVaultId) return;
     try {
-      await addCredential(user.uid, selectedVaultId, newCredential);
+      const newCredentialId = await addCredential(user.uid, selectedVaultId, newCredential);
       await addAuditLog(user.uid, 'Create Credential', `Saved credential for ${newCredential.url}.`);
       toast({
         title: 'Credential Added',
@@ -374,7 +381,8 @@ export default function DashboardPage() {
       
       const recipients = familyMembers.filter(m => newCredential.sharedWith?.includes(m.id));
       if (recipients.length > 0) {
-        await handleShareItem(newCredential, 'credential', recipients);
+        const credentialToShare = { ...newCredential, id: newCredentialId };
+        await handleShareItem(credentialToShare, 'credential', recipients);
       }
     } catch (error) {
       console.error("Error adding credential:", error);
@@ -429,7 +437,7 @@ export default function DashboardPage() {
   const handleAddSecureDocument = async (newDocument: Omit<SecureDocument, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => {
     if(!user || !selectedVaultId) return;
     try {
-      await addSecureDocument(user.uid, selectedVaultId, newDocument);
+      const newDocumentId = await addSecureDocument(user.uid, selectedVaultId, newDocument);
       await addAuditLog(user.uid, 'Create Secure Document', `Saved document named ${newDocument.name}.`);
       toast({
         title: 'Document Added',
@@ -438,7 +446,8 @@ export default function DashboardPage() {
 
       const recipients = familyMembers.filter(m => newDocument.sharedWith?.includes(m.id));
       if (recipients.length > 0) {
-        await handleShareItem(newDocument, 'document', recipients);
+        const documentToShare = { ...newDocument, id: newDocumentId };
+        await handleShareItem(documentToShare, 'document', recipients);
       }
     } catch (error) {
       console.error("Error adding document:", error);

@@ -3,6 +3,7 @@
 
 
 
+
 import { db } from '@/lib/firebase';
 import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
 import {
@@ -133,6 +134,7 @@ export function getCredentials(userId: string, callback: (credentials: Credentia
           sharedWith: data.sharedWith || [],
           ownerId: data.ownerId,
           ownerName: data.ownerName,
+          originalId: data.originalId,
         } as Credential;
     });
      // Sort client-side to avoid needing a composite index
@@ -198,7 +200,49 @@ export async function updateCredential(userId: string, id: string, credential: P
 
 export async function deleteCredential(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'credentials', id);
-  await deleteDoc(docRef);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    console.error(`Credential with id ${id} not found for user ${userId} to delete.`);
+    return;
+  }
+
+  const credential = docSnap.data();
+
+  // If this is a shared item someone else owns, just delete our copy.
+  // Owners cannot delete shared items from the shared list, UI prevents this.
+  // This is just a safeguard.
+  if (credential.ownerId) {
+    await deleteDoc(docRef);
+    return;
+  }
+
+  // If we are the owner, we need to delete the copies shared with others.
+  const batch = writeBatch(db);
+
+  if (credential.sharedWith && credential.sharedWith.length > 0) {
+    const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
+    const familyMembersSnap = await getDocs(familyMembersCol);
+    const familyMembers = familyMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as FamilyMember));
+    
+    const recipientUids = credential.sharedWith
+      .map((memberId: string) => familyMembers.find(fm => fm.id === memberId)?.uid)
+      .filter((uid: string | undefined): uid is string => !!uid);
+
+    await Promise.all(recipientUids.map(async (recipientUid) => {
+      const sharedCredsCol = collection(db, 'users', recipientUid, 'credentials');
+      const q = query(sharedCredsCol, where('originalId', '==', id));
+      const sharedDocsSnap = await getDocs(q);
+      sharedDocsSnap.forEach(sharedDoc => {
+        batch.delete(sharedDoc.ref);
+      });
+    }));
+  }
+
+  // Finally, delete the original credential
+  batch.delete(docRef);
+
+  await batch.commit();
 }
 
 // --- Family Members ---
@@ -413,6 +457,7 @@ export function getSecureDocuments(userId: string, callback: (documents: SecureD
           sharedWith: data.sharedWith || [],
           ownerId: data.ownerId,
           ownerName: data.ownerName,
+          originalId: data.originalId,
         } as SecureDocument;
     });
     // Sort client-side to avoid needing a composite index
@@ -472,7 +517,47 @@ export async function updateSecureDocument(userId: string, id: string, documentD
 
 export async function deleteSecureDocument(userId: string, id: string): Promise<void> {
   const docRef = doc(db, 'users', userId, 'secureDocuments', id);
-  await deleteDoc(docRef);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    console.error(`Secure document with id ${id} not found for user ${userId} to delete.`);
+    return;
+  }
+
+  const documentData = docSnap.data();
+
+  // If this is a shared item someone else owns, just delete our copy.
+  if (documentData.ownerId) {
+    await deleteDoc(docRef);
+    return;
+  }
+
+  // If we are the owner, we need to delete the copies shared with others.
+  const batch = writeBatch(db);
+
+  if (documentData.sharedWith && documentData.sharedWith.length > 0) {
+    const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
+    const familyMembersSnap = await getDocs(familyMembersCol);
+    const familyMembers = familyMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as FamilyMember));
+    
+    const recipientUids = documentData.sharedWith
+      .map((memberId: string) => familyMembers.find(fm => fm.id === memberId)?.uid)
+      .filter((uid: string | undefined): uid is string => !!uid);
+    
+    await Promise.all(recipientUids.map(async (recipientUid) => {
+      const sharedDocsCol = collection(db, 'users', recipientUid, 'secureDocuments');
+      const q = query(sharedDocsCol, where('originalId', '==', id));
+      const sharedDocsSnap = await getDocs(q);
+      sharedDocsSnap.forEach(sharedDoc => {
+        batch.delete(sharedDoc.ref);
+      });
+    }));
+  }
+
+  // Finally, delete the original document
+  batch.delete(docRef);
+
+  await batch.commit();
 }
 
 // --- Sharing ---
@@ -482,12 +567,32 @@ export async function addSharedItem(recipientUid: string, itemType: 'credential'
     const collectionName = itemType === 'credential' ? 'credentials' : 'secureDocuments';
     const itemsCol = collection(db, 'users', recipientUid, collectionName);
     
-    await addDoc(itemsCol, {
+    const { originalId } = itemData;
+
+    if (!originalId) {
+      console.error("Attempted to share an item without an originalId.", itemData);
+      return;
+    }
+        
+    const q = query(itemsCol, where('originalId', '==', originalId), limit(1));
+    const existingDocs = await getDocs(q);
+    
+    const dataPayload = {
         ...itemData,
         vaultId: personalVault.id,
-        createdAt: serverTimestamp(),
         lastModified: serverTimestamp(),
-    });
+    };
+
+    if (!existingDocs.empty) {
+        const existingDocRef = existingDocs.docs[0].ref;
+        delete dataPayload.createdAt;
+        await updateDoc(existingDocRef, dataPayload);
+    } else {
+        await addDoc(itemsCol, {
+            ...dataPayload,
+            createdAt: serverTimestamp(),
+        });
+    }
 }
 
 // --- Referrals & Invitations ---
