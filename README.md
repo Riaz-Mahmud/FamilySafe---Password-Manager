@@ -3,13 +3,13 @@
 FamilySafe is a modern, secure, and feature-rich password manager designed for families and individuals. Built with a focus on security and ease of use, it helps you manage your digital life safely. This application was built using Next.js, React, Firebase, and ShadCN UI.
 
 <p align="center">
-  <img alt="Dashboard View" src="https://placehold.co/1200x800.png" data-ai-hint="dashboard application" />
+  <img alt="Dashboard View" src="https://github.com/user-attachments/assets/98e1e50b-f905-4030-8163-7fc14799e7bb" data-ai-hint="dashboard application" />
   <br/>
   <em>The main dashboard, showing vaults, credentials, and documents.</em>
 </p>
 
 <p align="center">
-  <img alt="Add Credential Dialog" src="https://placehold.co/800x600.png" data-ai-hint="dialog form" />
+  <img alt="Add Credential Dialog" src="https://github.com/user-attachments/assets/59c57df7-59b7-4724-8232-0f7136349e7a" data-ai-hint="dialog form" />
   <br/>
   <em>Adding a new credential with options for expiry reminders, travel safety, and sharing.</em>
 </p>
