@@ -93,7 +93,7 @@ export async function recoverAccountAction(data: z.infer<typeof RecoverAccountSc
 
 const ShareItemServerSchema = z.object({
   recipientUid: z.string(),
-  itemType: z.enum(['credential', 'document']),
+  itemType: z.enum(['credential', 'document', 'memory']),
   itemData: z.any(),
   notificationData: z.any(),
 });

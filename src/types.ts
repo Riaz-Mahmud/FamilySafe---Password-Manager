@@ -80,3 +80,21 @@ export interface Notification {
     avatar?: string;
   };
 }
+
+export interface Memory {
+  id: string;
+  vaultId: string;
+  title: string;
+  story: string; // encrypted
+  memoryDate: string;
+  photoUrl?: string; // encrypted data URL
+  photoFileType?: string;
+  photoFileSize?: number;
+  tags: string[];
+  createdAt?: Date;
+  lastModified?: Date;
+  sharedWith: string[];
+  ownerId?: string;
+  ownerName?: string;
+  originalId?: string;
+}

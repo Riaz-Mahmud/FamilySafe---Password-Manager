@@ -38,6 +38,7 @@ import {
   Trash,
   GanttChartSquare,
   BadgeInfo,
+  Album,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -45,7 +46,7 @@ import { Button } from '@/components/ui/button';
 import { AddPasswordDialog } from '@/components/dashboard/add-password-dialog';
 import { PasswordList } from '@/components/dashboard/password-list';
 import { FamilyMembersList } from '@/components/dashboard/family-members-list';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification, Memory } from '@/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -84,6 +85,10 @@ import {
   addNotification,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  getMemories,
+  addMemory,
+  updateMemory,
+  deleteMemory,
 } from '@/services/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-provider';
@@ -103,6 +108,8 @@ import { SecureDocumentPreviewDialog } from '@/components/dashboard/secure-docum
 import { AddVaultDialog } from '@/components/dashboard/add-vault-dialog';
 import { encryptData } from '@/lib/crypto';
 import { NotificationsPopover } from '@/components/dashboard/notifications-popover';
+import { AddMemoryDialog } from '@/components/dashboard/add-memory-dialog';
+import { MemoryList } from '@/components/dashboard/memory-list';
 
 
 export default function DashboardPage() {
@@ -113,8 +120,10 @@ export default function DashboardPage() {
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [allOwnedCredentials, setAllOwnedCredentials] = useState<Credential[]>([]);
   const [allOwnedDocuments, setAllOwnedDocuments] = useState<SecureDocument[]>([]);
+  const [allOwnedMemories, setAllOwnedMemories] = useState<Memory[]>([]);
   const [allSharedCredentials, setAllSharedCredentials] = useState<Credential[]>([]);
   const [allSharedDocuments, setAllSharedDocuments] = useState<SecureDocument[]>([]);
+  const [allSharedMemories, setAllSharedMemories] = useState<Memory[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -133,6 +142,7 @@ export default function DashboardPage() {
   // Dialog state
   const [isAddPasswordDialogOpen, setAddPasswordDialogOpen] = useState(false);
   const [isAddDocumentDialogOpen, setAddDocumentDialogOpen] = useState(false);
+  const [isAddMemoryDialogOpen, setAddMemoryDialogOpen] = useState(false);
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
   const [isAddVaultDialogOpen, setAddVaultDialogOpen] = useState(false);
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
@@ -143,6 +153,8 @@ export default function DashboardPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editingDocument, setEditingDocument] = useState<SecureDocument | null>(null);
   const [deleteDocumentTargetId, setDeleteDocumentTargetId] = useState<string | null>(null);
+  const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [deleteMemoryTargetId, setDeleteMemoryTargetId] = useState<string | null>(null);
   const [editingFamilyMember, setEditingFamilyMember] = useState<FamilyMember | null>(null);
   const [deleteFamilyMemberTargetId, setDeleteFamilyMemberTargetId] = useState<string | null>(null);
   const [vaultToDelete, setVaultToDelete] = useState<Vault | null>(null);
@@ -234,8 +246,10 @@ export default function DashboardPage() {
     if (!user?.uid) {
       setAllOwnedCredentials([]);
       setAllOwnedDocuments([]);
+      setAllOwnedMemories([]);
       setAllSharedCredentials([]);
       setAllSharedDocuments([]);
+      setAllSharedMemories([]);
       return;
     }
     
@@ -252,9 +266,16 @@ export default function DashboardPage() {
       setItemsLoading(false);
     });
 
+    const unsubscribeMems = getMemories(user.uid, (allMems) => {
+      setAllOwnedMemories(allMems.filter(m => !m.ownerId));
+      setAllSharedMemories(allMems.filter(m => !!m.ownerId));
+      setItemsLoading(false);
+    });
+
     return () => {
       unsubscribeCreds();
       unsubscribeDocs();
+      unsubscribeMems();
     };
   }, [user?.uid]);
 
@@ -304,7 +325,7 @@ export default function DashboardPage() {
   
   const handleShareItem = async (
     itemData: any,
-    itemType: 'credential' | 'document',
+    itemType: 'credential' | 'document' | 'memory',
     recipients: FamilyMember[]
   ) => {
     if (!user) return;
@@ -340,22 +361,28 @@ export default function DashboardPage() {
           password: encryptData(baseData.password, recipient.uid),
           notes: encryptData(baseData.notes || '', recipient.uid),
         };
-      } else { // document
+      } else if (itemType === 'document') {
         encryptedForRecipient = {
           ...baseData,
           notes: encryptData(baseData.notes || '', recipient.uid),
           fileDataUrl: encryptData(baseData.fileDataUrl, recipient.uid),
         };
+      } else { // memory
+        encryptedForRecipient = {
+            ...baseData,
+            story: encryptData(baseData.story, recipient.uid),
+            photoUrl: baseData.photoUrl ? encryptData(baseData.photoUrl, recipient.uid) : '',
+        }
       }
 
       try {
         // Prepare notification data
         const notificationData = {
           userId: recipient.uid,
-          type: itemType === 'credential' ? 'share_credential' : 'share_document',
+          type: itemType === 'credential' ? 'share_credential' : (itemType === 'document' ? 'share_document' : 'info'),
           title: `New ${itemType} shared`,
-          message: `${user.displayName || user.email} shared "${itemData.name || itemData.url}" with you.`,
-          link: itemType === 'credential' ? '/?activeMenu=Shared%20Passwords' : '/?activeMenu=Shared%20Documents',
+          message: `${user.displayName || user.email} shared "${itemData.name || itemData.url || itemData.title}" with you.`,
+          link: `/`, // Update link based on item type
           from: {
             name: user.displayName || user.email || 'A User',
             avatar: user.photoURL || undefined,
@@ -386,7 +413,7 @@ export default function DashboardPage() {
     }
 
     if (sharedCount > 0) {
-      const itemTypeName = itemType === 'credential' ? 'Credential' : 'Document';
+      const itemTypeName = itemType.charAt(0).toUpperCase() + itemType.slice(1);
       toast({
         title: 'Shared Successfully',
         description: `${itemTypeName} shared with ${sharedCount} member(s).`,
@@ -517,6 +544,67 @@ export default function DashboardPage() {
         toast({ title: 'Error', description: 'Failed to delete secure document.', variant: 'destructive' });
       } finally {
         setDeleteDocumentTargetId(null);
+      }
+    }
+  };
+
+  // --- Memory Actions ---
+  const handleAddMemory = async (newMemory: Omit<Memory, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>) => {
+    if (!user || !selectedVaultId) return;
+    try {
+      const newMemoryId = await addMemory(user.uid, selectedVaultId, newMemory);
+      await addAuditLog(user.uid, 'Create Memory', `Saved memory titled "${newMemory.title}".`);
+      toast({
+        title: 'Memory Added',
+        description: 'The new memory has been saved successfully.',
+      });
+
+      const recipients = familyMembers.filter(m => newMemory.sharedWith?.includes(m.id));
+      if (recipients.length > 0) {
+        const memoryToShare = { ...newMemory, id: newMemoryId };
+        await handleShareItem(memoryToShare, 'memory', recipients);
+      }
+    } catch (error) {
+      console.error("Error adding memory:", error);
+      toast({ title: 'Error', description: 'Failed to add memory.', variant: 'destructive' });
+    }
+  };
+
+  const handleUpdateMemory = async (updatedMemory: Memory) => {
+    if (!user) return;
+    try {
+      const { id, ...dataToUpdate } = updatedMemory;
+      await updateMemory(user.uid, id, dataToUpdate);
+      await addAuditLog(user.uid, 'Update Memory', `Updated memory titled "${updatedMemory.title}".`);
+      toast({
+        title: 'Memory Updated',
+        description: 'The memory has been updated successfully.',
+      });
+    } catch (error) {
+      console.error("Error updating memory:", error);
+      toast({ title: 'Error', description: 'Failed to update memory.', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteMemory = async () => {
+    if (deleteMemoryTargetId && user) {
+      const allMems = [...allOwnedMemories, ...allSharedMemories];
+      const memToDelete = allMems.find(d => d.id === deleteMemoryTargetId);
+      try {
+        await deleteMemory(user.uid, deleteMemoryTargetId);
+        if (memToDelete) {
+           await addAuditLog(user.uid, 'Delete Memory', `Deleted memory titled "${memToDelete.title}".`);
+        }
+        toast({
+          title: 'Memory Deleted',
+          description: 'The memory has been permanently deleted.',
+          variant: 'destructive',
+        });
+      } catch (error) {
+        console.error("Error deleting memory:", error);
+        toast({ title: 'Error', description: 'Failed to delete memory.', variant: 'destructive' });
+      } finally {
+        setDeleteMemoryTargetId(null);
       }
     }
   };
@@ -678,6 +766,21 @@ export default function DashboardPage() {
     if (!open) setEditingDocument(null);
     setAddDocumentDialogOpen(open);
   };
+
+  const openAddMemoryDialog = () => {
+    setEditingMemory(null);
+    setAddMemoryDialogOpen(true);
+  };
+
+  const openEditMemoryDialog = (memory: Memory) => {
+    setEditingMemory(memory);
+    setAddMemoryDialogOpen(true);
+  };
+
+  const handleMemoryDialogChange = (open: boolean) => {
+    if (!open) setEditingMemory(null);
+    setAddMemoryDialogOpen(open);
+  };
   
   const openPreviewDialog = (doc: SecureDocument) => {
     setDocumentToPreview(doc);
@@ -734,9 +837,11 @@ export default function DashboardPage() {
   // --- Derived State for Filtering ---
   const vaultCredentials = allOwnedCredentials.filter(c => c.vaultId === selectedVaultId);
   const vaultDocuments = allOwnedDocuments.filter(d => d.vaultId === selectedVaultId);
+  const vaultMemories = allOwnedMemories.filter(m => m.vaultId === selectedVaultId);
 
   const credentialsToDisplay = activeMenu === 'Shared Passwords' ? allSharedCredentials : vaultCredentials;
   const documentsToDisplay = activeMenu === 'Shared Documents' ? allSharedDocuments : vaultDocuments;
+  const memoriesToDisplay = activeMenu === 'Shared Memories' ? allSharedMemories : vaultMemories;
 
   const filteredCredentials = credentialsToDisplay.filter(credential => {
       if (isTravelModeActive && !credential.safeForTravel) return false;
@@ -756,6 +861,15 @@ export default function DashboardPage() {
                  doc.fileType.toLowerCase().includes(lowerCaseSearchTerm);
       }
       return true;
+  });
+
+  const filteredMemories = memoriesToDisplay.filter(mem => {
+    if (searchTerm) {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        return mem.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+               (mem.tags && mem.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+    }
+    return true;
   });
 
   if (authLoading || isDataLoading) {
@@ -797,6 +911,11 @@ export default function DashboardPage() {
               onDelete={setDeleteDocumentTargetId}
               onPreview={openPreviewDialog}
             />
+            <MemoryList
+                memories={filteredMemories}
+                onEdit={openEditMemoryDialog}
+                onDelete={setDeleteMemoryTargetId}
+            />
           </div>
         );
       case 'All Passwords':
@@ -818,6 +937,14 @@ export default function DashboardPage() {
             onPreview={openPreviewDialog}
           />
         );
+      case 'Memories':
+        return (
+            <MemoryList
+                memories={filteredMemories}
+                onEdit={openEditMemoryDialog}
+                onDelete={setDeleteMemoryTargetId}
+            />
+        );
        case 'Shared Passwords':
         return (
           <PasswordList
@@ -836,6 +963,14 @@ export default function DashboardPage() {
             onPreview={openPreviewDialog}
           />
         );
+      case 'Shared Memories':
+        return (
+            <MemoryList
+                memories={filteredMemories}
+                onEdit={openEditMemoryDialog}
+                onDelete={setDeleteMemoryTargetId}
+            />
+        );
       case 'Family Members':
         return <FamilyMembersList familyMembers={familyMembers} onEdit={openEditFamilyMemberDialog} onDelete={setDeleteFamilyMemberTargetId} onMemberSelect={handleFamilyMemberSelect} />;
       case 'SharedWithFamilyMember': {
@@ -848,6 +983,10 @@ export default function DashboardPage() {
         const documentsSharedByMe = allOwnedDocuments.filter(d => d.sharedWith?.includes(selectedFamilyMember.id));
         const documentsSharedToMe = allSharedDocuments.filter(d => d.ownerId === selectedFamilyMember.uid);
         const combinedDocuments = [...documentsSharedByMe, ...documentsSharedToMe];
+
+        const memoriesSharedByMe = allOwnedMemories.filter(m => m.sharedWith?.includes(selectedFamilyMember.id));
+        const memoriesSharedToMe = allSharedMemories.filter(m => m.ownerId === selectedFamilyMember.uid);
+        const combinedMemories = [...memoriesSharedByMe, ...memoriesSharedToMe];
         
         const filteredCombinedCredentials = combinedCredentials.filter(credential => {
             if (searchTerm) {
@@ -868,7 +1007,16 @@ export default function DashboardPage() {
             return true;
         });
 
-        if (filteredCombinedCredentials.length === 0 && filteredCombinedDocuments.length === 0) {
+        const filteredCombinedMemories = combinedMemories.filter(mem => {
+          if (searchTerm) {
+              const lowerCaseSearchTerm = searchTerm.toLowerCase();
+              return mem.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+                     (mem.tags && mem.tags.some(tag => tag.toLowerCase().includes(lowerCaseSearchTerm)));
+          }
+          return true;
+        });
+
+        if (filteredCombinedCredentials.length === 0 && filteredCombinedDocuments.length === 0 && filteredCombinedMemories.length === 0) {
             return (
                 <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg h-full">
                     <Users className="h-16 w-16 text-muted-foreground mb-4" />
@@ -893,6 +1041,11 @@ export default function DashboardPage() {
               onEdit={openEditDocumentDialog}
               onDelete={setDeleteDocumentTargetId}
               onPreview={openPreviewDialog}
+            />}
+            {filteredCombinedMemories.length > 0 && <MemoryList
+                memories={filteredCombinedMemories}
+                onEdit={openEditMemoryDialog}
+                onDelete={setDeleteMemoryTargetId}
             />}
           </div>
         );
@@ -920,6 +1073,8 @@ export default function DashboardPage() {
     ? 'Passwords Shared with Me'
     : activeMenu === 'Shared Documents'
     ? 'Documents Shared with Me'
+    : activeMenu === 'Shared Memories'
+    ? 'Memories Shared with Me'
     : activeMenu;
 
   return (
@@ -945,6 +1100,11 @@ export default function DashboardPage() {
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={() => handleMenuClick('Secure Documents')} isActive={activeMenu === 'Secure Documents'} tooltip="Documents in Vault">
                   <FolderLock /> Documents
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => handleMenuClick('Memories')} isActive={activeMenu === 'Memories'} tooltip="Memories in Vault">
+                  <Album /> Memories
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarGroup>
@@ -976,6 +1136,11 @@ export default function DashboardPage() {
                  <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => handleMenuClick('Shared Documents')} isActive={activeMenu === 'Shared Documents'} tooltip="Documents shared with me">
                     <FolderLock /> Shared Documents
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => handleMenuClick('Shared Memories')} isActive={activeMenu === 'Shared Memories'} tooltip="Memories shared with me">
+                    <Album /> Shared Memories
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarGroup>
@@ -1055,7 +1220,7 @@ export default function DashboardPage() {
           <header className="flex items-center gap-4 mb-6">
             <SidebarTrigger className="md:hidden" />
             
-            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('All Items') || activeMenu.includes('Shared') || activeMenu === 'SharedWithFamilyMember' ? (
+            {activeMenu.includes('Password') || activeMenu.includes('Document') || activeMenu.includes('Memories') || activeMenu.includes('All Items') || activeMenu.includes('Shared') || activeMenu === 'SharedWithFamilyMember' ? (
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -1086,13 +1251,17 @@ export default function DashboardPage() {
                 ) : activeMenu !== 'SharedWithFamilyMember' &&
                    !['Password Health Report', 'Audit Logs', 'Device Management', 'Settings', 'Support'].includes(activeMenu) ? (
                     <>
-                        <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'Secure Documents' || activeMenu.includes('Shared')}>
+                        <Button onClick={openAddPasswordDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu.includes('Shared') || activeMenu === 'Secure Documents' || activeMenu === 'Memories'}>
                           <Plus className="h-5 w-5 md:mr-2" />
                           <span className="hidden md:inline">Add Credential</span>
                         </Button>
-                        <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu === 'All Passwords' || activeMenu.includes('Shared')}>
+                        <Button onClick={openAddDocumentDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu.includes('Shared') || activeMenu === 'All Passwords' || activeMenu === 'Memories'}>
                           <Plus className="h-5 w-5 md:mr-2" />
                           <span className="hidden md:inline">Add Document</span>
+                        </Button>
+                        <Button onClick={openAddMemoryDialog} className="font-semibold" disabled={!selectedVaultId || activeMenu.includes('Shared') || activeMenu === 'All Passwords' || activeMenu === 'Secure Documents'}>
+                          <Plus className="h-5 w-5 md:mr-2" />
+                          <span className="hidden md:inline">Add Memory</span>
                         </Button>
                     </>
                  ) : null}
@@ -1132,6 +1301,16 @@ export default function DashboardPage() {
         onAddDocument={handleAddSecureDocument}
         onUpdateDocument={handleUpdateSecureDocument}
         documentToEdit={editingDocument}
+        vaultId={selectedVaultId}
+        familyMembers={familyMembers}
+      />
+
+      <AddMemoryDialog
+        open={isAddMemoryDialogOpen}
+        onOpenChange={handleMemoryDialogChange}
+        onAddMemory={handleAddMemory}
+        onUpdateMemory={handleUpdateMemory}
+        memoryToEdit={editingMemory}
         vaultId={selectedVaultId}
         familyMembers={familyMembers}
       />
@@ -1193,6 +1372,23 @@ export default function DashboardPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setDeleteDocumentTargetId(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteSecureDocument} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={!!deleteMemoryTargetId} onOpenChange={(open) => !open && setDeleteMemoryTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete this memory from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteMemoryTargetId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteMemory} className="bg-destructive hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

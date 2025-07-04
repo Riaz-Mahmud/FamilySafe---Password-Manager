@@ -7,8 +7,9 @@
 
 
 
+
 import { db } from '@/lib/firebase';
-import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification } from '@/types';
+import type { Credential, FamilyMember, AuditLog, DeviceSession, SecureDocument, Vault, Notification, Memory } from '@/types';
 import {
   collection,
   addDoc,
@@ -101,6 +102,12 @@ export async function deleteVault(userId: string, vaultId: string): Promise<void
   const docsQuery = query(docsCol, where('vaultId', '==', vaultId));
   const docsSnapshot = await getDocs(docsQuery);
   docsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+  // Delete all memories in the vault
+  const memsCol = collection(db, 'users', userId, 'memories');
+  const memsQuery = query(memsCol, where('vaultId', '==', vaultId));
+  const memsSnapshot = await getDocs(memsQuery);
+  memsSnapshot.forEach(doc => batch.delete(doc.ref));
   
   // Delete the vault document itself
   const vaultRef = doc(db, 'users', userId, 'vaults', vaultId);
@@ -563,6 +570,120 @@ export async function deleteSecureDocument(userId: string, id: string): Promise<
   await batch.commit();
 }
 
+
+// --- Memories ---
+
+export function getMemories(userId: string, callback: (memories: Memory[]) => void): () => void {
+  const memoriesCol = collection(db, 'users', userId, 'memories');
+  const q = query(memoriesCol);
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const memories = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const key = userId;
+      return {
+        id: doc.id,
+        ...data,
+        story: decryptData(data.story, key),
+        photoUrl: data.photoUrl ? decryptData(data.photoUrl, key) : undefined,
+        lastModified: data.lastModified?.toDate(),
+        createdAt: data.createdAt?.toDate(),
+      } as Memory;
+    });
+    memories.sort((a,b) => (b.lastModified?.getTime() || 0) - (a.lastModified?.getTime() || 0));
+    callback(memories);
+  }, (error) => {
+    console.error("Error fetching memories:", error);
+    callback([]);
+  });
+
+  return unsubscribe;
+}
+
+export async function addMemory(userId: string, vaultId: string, memoryData: Omit<Memory, 'id' | 'lastModified' | 'createdAt' | 'vaultId'>): Promise<string> {
+  const memoriesCol = collection(db, 'users', userId, 'memories');
+  
+  const encryptedMemory = {
+    ...memoryData,
+    vaultId,
+    story: encryptData(memoryData.story, userId),
+    photoUrl: memoryData.photoUrl ? encryptData(memoryData.photoUrl, userId) : '',
+    sharedWith: memoryData.sharedWith || [],
+    createdAt: serverTimestamp(),
+    lastModified: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(memoriesCol, encryptedMemory);
+  return docRef.id;
+}
+
+export async function updateMemory(userId: string, id: string, memoryData: Partial<Omit<Memory, 'id' | 'createdAt'>>): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'memories', id);
+  
+  const dataToUpdate = { ...memoryData };
+
+  if (dataToUpdate.story !== undefined) {
+    dataToUpdate.story = encryptData(dataToUpdate.story, userId);
+  }
+  if (dataToUpdate.photoUrl) {
+    dataToUpdate.photoUrl = encryptData(dataToUpdate.photoUrl, userId);
+  }
+  
+  Object.keys(dataToUpdate).forEach(key => {
+      const typedKey = key as keyof typeof dataToUpdate;
+      if (dataToUpdate[typedKey] === undefined) {
+          delete dataToUpdate[typedKey];
+      }
+  });
+
+  await updateDoc(docRef, {
+      ...dataToUpdate,
+      lastModified: serverTimestamp(),
+  });
+}
+
+export async function deleteMemory(userId: string, id: string): Promise<void> {
+  const docRef = doc(db, 'users', userId, 'memories', id);
+  const docSnap = await getDoc(docRef);
+
+  if (!docSnap.exists()) {
+    console.error(`Memory with id ${id} not found for user ${userId} to delete.`);
+    return;
+  }
+
+  const memoryData = docSnap.data();
+
+  if (memoryData.ownerId) {
+    await deleteDoc(docRef);
+    return;
+  }
+
+  const batch = writeBatch(db);
+
+  if (memoryData.sharedWith && memoryData.sharedWith.length > 0) {
+    const familyMembersCol = collection(db, 'users', userId, 'familyMembers');
+    const familyMembersSnap = await getDocs(familyMembersCol);
+    const familyMembers = familyMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as FamilyMember));
+    
+    const recipientUids = memoryData.sharedWith
+      .map((memberId: string) => familyMembers.find(fm => fm.id === memberId)?.uid)
+      .filter((uid: string | undefined): uid is string => !!uid);
+    
+    await Promise.all(recipientUids.map(async (recipientUid) => {
+      const sharedDocsCol = collection(db, 'users', recipientUid, 'memories');
+      const q = query(sharedDocsCol, where('originalId', '==', id));
+      const sharedDocsSnap = await getDocs(q);
+      sharedDocsSnap.forEach(sharedDoc => {
+        batch.delete(sharedDoc.ref);
+      });
+    }));
+  }
+
+  batch.delete(docRef);
+  await batch.commit();
+}
+
+
 // --- Referrals & Invitations ---
 
 export async function recordReferral(referrerId: string, referredUid: string): Promise<void> {
@@ -648,7 +769,7 @@ export async function deleteUserData(userId: string): Promise<void> {
   }
   
   // Delete all subcollections under the user's document.
-  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments', 'vaults', 'notifications'];
+  const subcollections = ['credentials', 'familyMembers', 'auditLogs', 'sessions', 'successful_referrals', 'secureDocuments', 'vaults', 'notifications', 'memories'];
   const deleteSubCollectionPromises = subcollections.map(sub => deleteCollection(`users/${userId}/${sub}`));
   await Promise.all(deleteSubCollectionPromises);
 
@@ -669,8 +790,10 @@ export async function getUserDataForExport(userId: string): Promise<object> {
     const secureDocumentsCol = collection(db, 'users', userId, 'secureDocuments');
     const vaultsCol = collection(db, 'users', userId, 'vaults');
     const notificationsCol = collection(db, 'users', userId, 'notifications');
+    const memoriesCol = collection(db, 'users', userId, 'memories');
 
-    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap, notificationsSnap] = await Promise.all([
+
+    const [credentialsSnap, familyMembersSnap, auditLogsSnap, sessionsSnap, referralsSnap, secureDocumentsSnap, vaultsSnap, notificationsSnap, memoriesSnap] = await Promise.all([
         getDocs(query(credentialsCol)),
         getDocs(familyMembersCol),
         getDocs(query(auditLogsCol, orderBy('timestamp', 'desc'))),
@@ -679,6 +802,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         getDocs(query(secureDocumentsCol)),
         getDocs(query(vaultsCol, orderBy('name'))),
         getDocs(query(notificationsCol, orderBy('createdAt', 'desc'))),
+        getDocs(query(memoriesCol)),
     ]);
 
     const credentials = credentialsSnap.docs.map(doc => {
@@ -708,6 +832,21 @@ export async function getUserDataForExport(userId: string): Promise<object> {
             // Users should download files individually from the UI.
             fileType: data.fileType,
             fileSize: data.fileSize,
+            lastModified: formatTimestamp(data.lastModified),
+            createdAt: formatTimestamp(data.createdAt),
+            vaultId: data.vaultId,
+        };
+    });
+
+    const memories = memoriesSnap.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            title: data.title,
+            story: decryptData(data.story, userId),
+            memoryDate: data.memoryDate,
+            tags: data.tags || [],
+            // Note: photoUrl is not exported for security/size.
             lastModified: formatTimestamp(data.lastModified),
             createdAt: formatTimestamp(data.createdAt),
             vaultId: data.vaultId,
@@ -760,6 +899,7 @@ export async function getUserDataForExport(userId: string): Promise<object> {
         vaults,
         credentials,
         secureDocuments,
+        memories,
         familyMembers,
         auditLogs,
         deviceSessions,

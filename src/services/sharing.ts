@@ -9,7 +9,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 const ShareItemAndNotifyInputSchema = z.object({
   recipientUid: z.string(),
-  itemType: z.enum(['credential', 'document']),
+  itemType: z.enum(['credential', 'document', 'memory']),
   itemData: z.any(),
   notificationData: z.any(),
 });
@@ -48,7 +48,16 @@ export async function shareItemAndNotify(input: ShareItemAndNotifyInput): Promis
 
     // 1. Share the item
     const personalVaultId = await adminGetOrCreatePersonalVault(recipientUid);
-    const collectionName = itemType === 'credential' ? 'credentials' : 'secureDocuments';
+    
+    let collectionName: string;
+    if (itemType === 'credential') {
+        collectionName = 'credentials';
+    } else if (itemType === 'document') {
+        collectionName = 'secureDocuments';
+    } else {
+        collectionName = 'memories';
+    }
+
     const itemsCol = adminDb.collection('users').doc(recipientUid).collection(collectionName);
 
     const { originalId } = itemData;
