@@ -30,6 +30,7 @@ FamilySafe is a modern, secure, and feature-rich password manager designed for f
 -   **Audit Logs**: Keep track of all important activities in your account, including sign-ins, credential changes, and sharing events.
 -   **Data Export & Deletion**: In compliance with privacy regulations like GDPR & CCPA, you can export all your data or permanently delete your account.
 -   **Family Group Management**: Add or remove family members to control who you can share items with.
+-   **Memory Vault**: A secure, encrypted space to preserve life memories, stories, and photos as a digital family heirloom.
 
 ## Zero-Knowledge Encryption Architecture
 
@@ -159,73 +160,48 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 We welcome contributions from the community! Whether you're a developer, designer, or security enthusiast, there’s a place for you in the FamilySafe project.
 
 Some areas we're particularly interested in exploring:
--   **Browser Extension**: Build a browser extension for autofilling credentials. This would be the foundation for features like **Smart Sync**, which could suggest saving passwords for frequently visited sites by analyzing local browser history securely.
--   **Memory Vault - Generational Memory Keeper**: A major feature focused on securely preserving life memories and digital family history. This would create a living, encrypted digital heirloom for future generations. Core concepts include:
-    -   **Legacy Messaging**: Secure, time-locked audio or text messages to be delivered to loved ones in the future.
-    -   **Advice Capsules**: Encrypted notes attached to life milestones (e.g., "When you go to college, read this").
-    -   **Story Cards**: Structured templates to share family origin stories with photos and values.
-    -   **Family Time Capsule**: Configure memories to unlock on specific future dates.
+-   **Browser Extension & Smart Sync**: Build a browser extension for autofilling credentials. This would be the foundation for features like **Smart Sync**, which could suggest saving passwords for frequently visited sites by analyzing local browser history securely.
 -   **Localization & Internationalization**: Help make FamilySafe accessible to a global audience.
 -   **Third-Party Integrations**: Develop a plugin or extension system for integrating with other services.
 -   **Enhanced Testing**: Improve our test coverage with more unit, integration, and end-to-end tests.
 -   **CI/CD Workflow Improvements**: Help streamline our development and deployment pipeline.
 
-### Advanced Contribution Idea: "Digital DNA" Behavioral Biometrics
+Below are proposals for advanced features that would require significant architectural work and expertise.
 
-This is a proposal for a sophisticated, privacy-first identity recovery system using behavioral biometrics as a fallback verification method.
+### 💡 Advanced Feature Proposal: "Memory Vault"
 
-#### 🔐 Purpose:
-To create a secure identity recovery path for users who have lost their master password AND their recovery kit, by verifying their identity through unique behavioral patterns.
+-   **Purpose**: To securely preserve important life memories and digital family history, creating a living, encrypted digital heirloom for future generations.
+-   **Core Concepts**:
+    -   **Legacy Messaging**: Record secure, time-locked audio or text messages to be delivered to a loved one in the future (e.g., when they turn 18).
+    -   **Advice Capsules**: Encrypted notes attached to life milestones (e.g., "When you go to college, read this").
+    -   **Story Cards**: Structured templates to share family origin stories with photos and values. The current "Memories" feature is the first step toward this.
+    -   **Family Time Capsule**: Configure memories to unlock on specific future dates.
 
-#### 💡 Core Concept:
-The system continuously and passively learns a user's unique patterns—such as typing rhythm, mouse movement, and navigation habits—to create a "behavioral fingerprint." This fingerprint is stored in an encrypted state and can be used to verify the user's identity with a certain confidence level during a recovery attempt.
+### 📍 Advanced Feature Proposal: "Geo-Smart Vaults"
 
-#### 🏛️ Proposed Architecture & Firebase Implementation
+-   **Purpose**: To add a layer of physical security by allowing access to specific vaults only from trusted geographical locations (e.g., "Bills Vault" only opens at home).
+-   **Security Warning**: A purely client-side implementation of this is **not secure**, as browser location can be easily spoofed. A robust implementation is required.
+-   **Proposed Architecture**:
+    1.  **Per-Vault Encryption**: Each vault must have its own unique encryption key, separate from the user's master key.
+    2.  **Key Wrapping**: The user's master key is used to encrypt each individual vault key. These encrypted vault keys are stored in Firestore.
+    3.  **Location Verification**: When accessing a geo-locked vault, the app sends the device's current coordinates to a secure Firebase Function.
+    4.  **Conditional Key Release**: The Firebase Function verifies if the coordinates are within the vault's pre-defined geofence. **Only if the location is valid** does the function return the *encrypted vault key* to the client.
+    5.  **Client-Side Decryption**: The client uses the master key to decrypt the received vault key, which it can then use to decrypt the vault's contents. This ensures that the client never has access to the vault's key unless the physical location is verified by the server.
 
-This architecture is designed to be privacy-first, adhering to the zero-knowledge principles of the app.
+### 🧬 Advanced Feature Proposal: "Digital DNA" Behavioral Biometrics
 
-**Phase 1: Behavioral Data Collection (Client-Side)**
--   **What:** Capture raw behavioral data using JavaScript event listeners.
-    -   **Typing Rhythm:** Record timestamps and keycodes for `keydown` and `keyup` events. Analyze metrics like flight time (time between releasing one key and pressing the next) and dwell time (time a key is held down).
-    -   **Mouse/Touch Dynamics:** Track mouse velocity, acceleration, click patterns, and touch gesture paths (`touchstart`, `touchmove`, `touchend`).
-    -   **Navigation Patterns:** Log sequences of UI interactions (e.g., time spent on `Settings` page vs. `Passwords` page).
--   **Privacy:** This raw data is highly sensitive and **must never leave the user's device**. It is used only for the next phase.
-
-**Phase 2: On-Device Profile Generation (Client-Side)**
--   **What:** The raw behavioral data is processed on-device into an abstract statistical model—the "behavioral fingerprint." This is not the raw data itself, but a mathematical representation (e.g., a vector of means, standard deviations, and other statistical moments).
--   **Tools:**
-    -   **TensorFlow.js (TFLite for Web):** A lightweight on-device ML library can be trained to create a robust user model. The app would collect data passively and, once enough is gathered, train or update a small model locally in the browser.
-    -   **Custom Logic:** Alternatively, a non-ML statistical model can be created by calculating and storing key metrics.
--   **Privacy:** The training and processing happen entirely in the user's browser. The server never sees the raw behavioral data.
-
-**Phase 3: Secure Fingerprint Storage (Client-Side Encryption -> Firestore)**
--   **What:** The generated behavioral fingerprint (the abstract model) is encrypted using the user's unique encryption key (the same one used for passwords, derived from their master password).
--   **Tools:**
-    -   **`crypto.ts`:** Use the existing `encryptData` function.
-    -   **Firestore:** The encrypted fingerprint is stored in a dedicated document in the user's private Firestore collection (e.g., `/users/{uid}/behavioral_fingerprints/{deviceId}`). Storing it per-device allows for device-specific patterns.
--   **Privacy:** The server only ever stores an encrypted blob that it cannot read, maintaining the zero-knowledge principle.
-
-**Phase 4: Identity Verification During Recovery (Client + Firebase Functions)**
--   **Flow:**
-    1.  User starts a recovery flow and is prompted to perform a series of actions (e.g., "Type the following sentence," "Move your mouse to the target").
-    2.  A **live behavioral fingerprint** is generated on-device from these actions.
-    3.  The app fetches the **encrypted stored fingerprint** from Firestore.
-    4.  The user is prompted for their master password. This is **only** used locally to decrypt the stored fingerprint. *If the user has forgotten it, this system cannot work as a standalone.* It's best used as a *secondary* factor alongside a weakened-but-not-forgotten password or another factor.
-    5.  Both the live fingerprint and the now-decrypted stored fingerprint (both abstract models, not raw data) are sent to a secure Firebase Function.
--   **Tools:**
-    -   **Firebase Functions:** The Function receives the two abstract fingerprints. Its sole job is to run a comparison algorithm (e.g., cosine similarity, Euclidean distance) and return a confidence score (0-100). The comparison logic is kept on the server to prevent it from being reverse-engineered on the client.
-    -   **Firebase App Check:** This is **critical**. The Firebase Function must be protected with App Check to ensure that only legitimate instances of your app can request a comparison. This prevents replay attacks and abuse of the verification endpoint.
--   **Result:** Based on the confidence score returned by the Function, the app can decide to either grant access or trigger another verification step (like the secret recovery key).
-
-#### 🤝 How to Contribute
-Developing this feature would involve:
--   Researching and implementing lightweight data capture scripts for typing and mouse dynamics.
--   Designing a robust statistical model for the behavioral fingerprint.
--   Integrating TensorFlow.js for on-device model training and inference.
--   Building the secure Firebase Function for fingerprint comparison.
--   Designing the UI/UX for the data collection and recovery challenge phases.
-
-If you have expertise in machine learning, browser security, and front-end development, this is a challenging and rewarding feature to lead.
+-   **Purpose**: To create a secure identity recovery path for users who have lost their master password AND their recovery kit, by verifying their identity through unique behavioral patterns.
+-   **Core Concept**: The system continuously and passively learns a user's unique patterns—such as typing rhythm, mouse movement, and navigation habits—to create a "behavioral fingerprint."
+-   **Proposed Architecture**:
+    1.  **Behavioral Data Collection (Client-Side)**: Capture raw data (e.g., `keydown` timings, mouse velocity) locally in the browser. This data **never** leaves the device.
+    2.  **On-Device Profile Generation (Client-Side)**: Use a library like **TensorFlow.js** to process the raw data into an abstract statistical model (the "fingerprint"). This model, not the raw data, is what gets stored.
+    3.  **Secure Fingerprint Storage**: The generated fingerprint is encrypted using the user's key and stored in a private Firestore collection. The server only ever sees an encrypted blob.
+    4.  **Identity Verification (Client + Firebase Functions)**:
+        -   During recovery, a user performs a challenge (e.g., types a sentence). A live fingerprint is generated.
+        -   The app fetches the encrypted stored fingerprint. The user is prompted for their master password **only** to decrypt this stored fingerprint locally.
+        -   Both the live and the decrypted stored fingerprints (both are abstract models) are sent to a secure Firebase Function.
+        -   The Function, protected by **App Check**, compares the two fingerprints and returns a confidence score.
+        -   Based on the score, the app either grants access or requires another recovery method.
 
 ## Contributors
 
@@ -242,3 +218,5 @@ A special thanks to the following people who have contributed to this project:
     </td>
   </tr>
 </table>
+
+    
