@@ -1,6 +1,10 @@
 import { cn } from "@/lib/utils";
-import type { PasswordStrengthOutput } from "@/ai/flows/password-strength-checker";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+
+export type PasswordStrengthOutput = {
+  strength: 'Weak' | 'Moderate' | 'Strong' | 'Very Strong';
+  suggestions: string[];
+};
 
 type PasswordStrengthMeterProps = {
   strengthResult: PasswordStrengthOutput | null;

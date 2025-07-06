@@ -41,9 +41,7 @@ import { PassphraseGenerator } from './passphrase-generator';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { useDebounce } from '@/hooks/use-debounce';
-import { PasswordStrengthMeter } from './password-strength-meter';
-import type { PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
-import { checkPasswordStrengthAction } from '@/app/actions';
+import { PasswordStrengthMeter, type PasswordStrengthOutput } from './password-strength-meter';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -65,6 +63,66 @@ type AddPasswordDialogProps = {
   vaultId: string | null;
   familyMembers: FamilyMember[];
 };
+
+function checkPasswordStrength(password: string): PasswordStrengthOutput {
+  let score = 0;
+  const suggestions: string[] = [];
+
+  if (!password || password.length === 0) {
+    return {
+      strength: 'Weak',
+      suggestions: ['Enter a password to check its strength.'],
+    };
+  }
+  
+  if (password.length < 8) {
+    suggestions.push('Use 8 or more characters.');
+  } else if (password.length >= 12) {
+    score += 2;
+  } else {
+    score += 1;
+  }
+
+  if (/[A-Z]/.test(password)) {
+    score++;
+  } else {
+    suggestions.push('Add an uppercase letter.');
+  }
+
+  if (/[a-z]/.test(password)) {
+    score++;
+  } else {
+     suggestions.push('Add a lowercase letter.');
+  }
+
+  if (/\d/.test(password)) {
+    score++;
+  } else {
+    suggestions.push('Add a number.');
+  }
+
+  if (/[^A-Za-z0-9]/.test(password)) {
+    score++;
+  } else {
+    suggestions.push('Add a special character (e.g., !@#).');
+  }
+
+  let strength: PasswordStrengthOutput['strength'] = 'Weak';
+  if (score >= 6) {
+    strength = 'Very Strong';
+  } else if (score >= 5) {
+    strength = 'Strong';
+  } else if (score >= 3) {
+    strength = 'Moderate';
+  }
+
+  if (strength === 'Very Strong') {
+    return { strength, suggestions: [] };
+  }
+  
+  return { strength, suggestions };
+}
+
 
 export function AddPasswordDialog({
   open,
@@ -101,16 +159,18 @@ export function AddPasswordDialog({
   const debouncedPassword = useDebounce(passwordValue, 500);
 
   useEffect(() => {
+    setIsCheckingStrength(true);
+  }, [passwordValue]);
+
+  useEffect(() => {
     if (open) {
       if (debouncedPassword && debouncedPassword.length > 0) {
-        setIsCheckingStrength(true);
-        checkPasswordStrengthAction(debouncedPassword).then((result) => {
-          setStrengthResult(result);
-          setIsCheckingStrength(false);
-        });
+        const result = checkPasswordStrength(debouncedPassword);
+        setStrengthResult(result);
       } else {
         setStrengthResult(null);
       }
+      setIsCheckingStrength(false);
     }
   }, [debouncedPassword, open]);
 
