@@ -33,11 +33,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { Credential, FamilyMember } from '@/types';
-import { X, Eye, EyeOff } from 'lucide-react';
+import { X, Eye, EyeOff, Copy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import { PassphraseGenerator } from './passphrase-generator';
+import { PasswordGenerator } from './password-generator';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -206,6 +207,23 @@ export function AddPasswordDialog({
     }
   }, [open, credentialToEdit, form]);
   
+  const handleCopy = () => {
+    const password = form.getValues('password');
+    if (password) {
+        navigator.clipboard.writeText(password);
+        toast({
+          title: 'Copied to clipboard',
+          description: `Password has been copied successfully.`,
+        });
+    } else {
+        toast({
+          title: 'Nothing to Copy',
+          description: `The password field is empty.`,
+          variant: 'destructive'
+        });
+    }
+  };
+
   function onSubmit(values: z.infer<typeof formSchema>) {
     const data = {
         ...values,
@@ -232,7 +250,7 @@ export function AddPasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="font-headline">{isEditing ? 'Edit Credential' : 'Add a New Credential'}</DialogTitle>
           <DialogDescription>
@@ -311,7 +329,14 @@ export function AddPasswordDialog({
                 
                 <PasswordStrengthMeter strengthResult={strengthResult} isChecking={isCheckingStrength} />
 
-                <PassphraseGenerator form={form} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <PassphraseGenerator form={form} />
+                  <PasswordGenerator form={form} />
+                </div>
+                
+                <Button type="button" size="sm" variant="secondary" className="w-full" onClick={handleCopy}>
+                    <Copy className="mr-2 h-4 w-4" /> Copy Current Password
+                </Button>
 
                 <FormField
                 control={form.control}

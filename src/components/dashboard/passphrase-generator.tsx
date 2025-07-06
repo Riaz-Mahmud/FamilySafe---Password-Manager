@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import type { UseFormReturn } from 'react-hook-form';
 
 // A simple wordlist for local generation. In a real app, this could be much larger.
@@ -37,32 +37,15 @@ export function PassphraseGenerator({ form }: PassphraseGeneratorProps) {
 
   const handleGenerateAndApply = () => {
     const newPassphrase = generateLocalPassphrase(wordCount);
-    form.setValue('password', newPassphrase, { shouldValidate: true });
+    form.setValue('password', newPassphrase, { shouldValidate: true, shouldDirty: true });
     toast({
       title: 'Passphrase Generated',
       description: 'A new passphrase has been generated and applied.',
     });
   };
-  
-  const handleCopy = () => {
-    const password = form.getValues('password');
-    if (password) {
-        navigator.clipboard.writeText(password);
-        toast({
-          title: 'Copied to clipboard',
-          description: `Password has been copied successfully.`,
-        });
-    } else {
-        toast({
-          title: 'Nothing to Copy',
-          description: `The password field is empty.`,
-          variant: 'destructive'
-        });
-    }
-  };
 
   return (
-    <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+    <div className="space-y-2 p-3 bg-muted/50 rounded-lg h-full flex flex-col justify-between">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
           <h4 className="font-medium">Passphrase Generator</h4>
@@ -86,9 +69,6 @@ export function PassphraseGenerator({ form }: PassphraseGeneratorProps) {
        <div className="flex flex-col sm:flex-row gap-2 pt-2">
             <Button type="button" size="sm" className="w-full" onClick={handleGenerateAndApply}>
               <Sparkles className="mr-2 h-4 w-4" /> Generate & Apply
-            </Button>
-            <Button type="button" size="sm" variant="secondary" className="w-full" onClick={handleCopy}>
-              <Copy className="mr-2 h-4 w-4" /> Copy Current Password
             </Button>
         </div>
     </div>
