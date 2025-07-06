@@ -6,6 +6,7 @@ import { sendCredentialEmail } from '@/ai/flows/send-credential-email-flow';
 import { sendInvitationEmail } from '@/ai/flows/send-invitation-email-flow';
 import { recoverAccount } from '@/services/recovery';
 import { shareItemAndNotify } from '@/services/sharing';
+import { checkPasswordStrength, type PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
 
 const SendEmailSchema = z.object({
   emails: z.array(z.string().email()),
@@ -112,4 +113,10 @@ export async function shareItemAction(data: z.infer<typeof ShareItemServerSchema
             message: 'An unexpected error occurred while sharing.' 
         };
     }
+}
+
+
+export async function checkPasswordStrengthAction(password: string): Promise<PasswordStrengthOutput> {
+  // We can call the flow directly. Zod will handle validation inside the flow.
+  return await checkPasswordStrength(password);
 }

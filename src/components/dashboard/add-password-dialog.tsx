@@ -40,6 +40,10 @@ import { Switch } from '@/components/ui/switch';
 import { PassphraseGenerator } from './passphrase-generator';
 import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
+import { useDebounce } from '@/hooks/use-debounce';
+import { PasswordStrengthMeter } from './password-strength-meter';
+import type { PasswordStrengthOutput } from '@/ai/flows/password-strength-checker';
+import { checkPasswordStrengthAction } from '@/app/actions';
 
 const formSchema = z.object({
   url: z.string().min(1, { message: 'Website or Application name is required.' }),
@@ -76,6 +80,9 @@ export function AddPasswordDialog({
   const { toast } = useToast();
   const isEditing = !!credentialToEdit;
 
+  const [strengthResult, setStrengthResult] = useState<PasswordStrengthOutput | null>(null);
+  const [isCheckingStrength, setIsCheckingStrength] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -90,10 +97,29 @@ export function AddPasswordDialog({
     },
   });
 
+  const passwordValue = form.watch('password');
+  const debouncedPassword = useDebounce(passwordValue, 500);
+
+  useEffect(() => {
+    if (open) {
+      if (debouncedPassword && debouncedPassword.length > 0) {
+        setIsCheckingStrength(true);
+        checkPasswordStrengthAction(debouncedPassword).then((result) => {
+          setStrengthResult(result);
+          setIsCheckingStrength(false);
+        });
+      } else {
+        setStrengthResult(null);
+      }
+    }
+  }, [debouncedPassword, open]);
+
   useEffect(() => {
     if (open) {
       setShowPassword(false);
       setTagInput('');
+      setStrengthResult(null);
+      setIsCheckingStrength(false);
       if (credentialToEdit) {
         form.reset({
           url: credentialToEdit.url,
@@ -222,6 +248,8 @@ export function AddPasswordDialog({
                     </FormItem>
                 )}
                 />
+                
+                <PasswordStrengthMeter strengthResult={strengthResult} isChecking={isCheckingStrength} />
 
                 <PassphraseGenerator form={form} />
 
