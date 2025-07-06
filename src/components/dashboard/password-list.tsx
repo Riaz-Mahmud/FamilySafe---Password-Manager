@@ -26,7 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle, Plane } from 'lucide-react';
+import { Copy, MoreHorizontal, Globe, Trash2, Edit, KeyRound, Github, Bot, Mail, AlertTriangle, Plane, Eye } from 'lucide-react';
 import type { Credential } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { addMonths, differenceInDays, format, isPast } from 'date-fns';
@@ -37,6 +37,7 @@ type PasswordListProps = {
   onEdit: (credential: Credential) => void;
   onDelete: (id: string) => void;
   onSend: (credential: Credential) => void;
+  onPreview: (credential: Credential) => void;
   isTravelModeActive?: boolean;
 };
 
@@ -74,7 +75,7 @@ const getExpiryStatus = (createdAt: Date | undefined, expiryMonths: number | und
   return { status: 'ok', message: `Expires on ${format(expiryDate, 'MMM d, yyyy')}` };
 };
 
-export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelModeActive }: PasswordListProps) {
+export function PasswordList({ credentials, onEdit, onDelete, onSend, onPreview, isTravelModeActive }: PasswordListProps) {
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -176,13 +177,16 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
             const IconComponent = iconMap[credential.icon] || Globe;
             return (
                 <Card key={credential.id} className="w-full">
-                    <CardContent className="p-4 flex flex-col gap-4">
+                    <CardContent className="p-4 flex flex-col gap-4 group/pass-card">
                         <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3 overflow-hidden">
+                            <div 
+                                className="flex items-center gap-3 overflow-hidden cursor-pointer"
+                                onClick={() => onPreview(credential)}
+                            >
                                 <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
                                 <IconComponent className="w-5 h-5 text-muted-foreground" />
                                 </div>
-                                <div className="flex flex-col overflow-hidden">
+                                <div className="flex flex-col overflow-hidden transition-colors group-hover/pass-card:text-primary">
                                     {renderSiteCell(credential)}
                                     {renderTags(credential)}
                                     {renderOwnership(credential)}
@@ -195,6 +199,10 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => onPreview(credential)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Preview
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => onEdit(credential)} disabled={!!credential.ownerId}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Edit
@@ -267,12 +275,15 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
               const IconComponent = iconMap[credential.icon] || Globe;
               return (
                 <TableRow key={credential.id}>
-                  <TableCell>
+                  <TableCell 
+                    className="cursor-pointer group/pass-row"
+                    onClick={() => onPreview(credential)}
+                  >
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
                         <IconComponent className="w-5 h-5 text-muted-foreground" />
                       </div>
-                      <div className="flex flex-col overflow-hidden">
+                      <div className="flex flex-col overflow-hidden transition-colors group-hover/pass-row:text-primary">
                         {renderSiteCell(credential)}
                         {renderTags(credential)}
                         {renderOwnership(credential)}
@@ -320,6 +331,10 @@ export function PasswordList({ credentials, onEdit, onDelete, onSend, isTravelMo
                           </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onPreview(credential)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Preview
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEdit(credential)} disabled={!!credential.ownerId}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit

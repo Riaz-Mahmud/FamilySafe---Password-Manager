@@ -39,6 +39,7 @@ import {
   GanttChartSquare,
   BadgeInfo,
   Album,
+  Eye,
 } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { Input } from '@/components/ui/input';
@@ -111,6 +112,7 @@ import { NotificationsPopover } from '@/components/dashboard/notifications-popov
 import { AddMemoryDialog } from '@/components/dashboard/add-memory-dialog';
 import { MemoryList } from '@/components/dashboard/memory-list';
 import { MemoryPreviewDialog } from '@/components/dashboard/memory-preview-dialog';
+import { PasswordPreviewDialog } from '@/components/dashboard/password-preview-dialog';
 
 
 export default function DashboardPage() {
@@ -147,8 +149,9 @@ export default function DashboardPage() {
   const [isAddFamilyMemberDialogOpen, setAddFamilyMemberDialogOpen] = useState(false);
   const [isAddVaultDialogOpen, setAddVaultDialogOpen] = useState(false);
   const [isSendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
-  const [isPreviewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [isDocPreviewDialogOpen, setDocPreviewDialogOpen] = useState(false);
   const [isMemoryPreviewOpen, setMemoryPreviewOpen] = useState(false);
+  const [isPasswordPreviewOpen, setPasswordPreviewOpen] = useState(false);
   
   // Editing and Deleting state
   const [editingCredential, setEditingCredential] = useState<Credential | null>(null);
@@ -165,6 +168,7 @@ export default function DashboardPage() {
   const [credentialToSend, setCredentialToSend] = useState<Credential | null>(null);
   const [documentToPreview, setDocumentToPreview] = useState<SecureDocument | null>(null);
   const [memoryToPreview, setMemoryToPreview] = useState<Memory | null>(null);
+  const [credentialToPreview, setCredentialToPreview] = useState<Credential | null>(null);
 
   const { toast } = useToast();
 
@@ -785,14 +789,24 @@ export default function DashboardPage() {
     setAddMemoryDialogOpen(open);
   };
   
-  const openPreviewDialog = (doc: SecureDocument) => {
+  const openDocPreviewDialog = (doc: SecureDocument) => {
     setDocumentToPreview(doc);
-    setPreviewDialogOpen(true);
+    setDocPreviewDialogOpen(true);
   };
 
-  const handlePreviewDialogChange = (open: boolean) => {
+  const handleDocPreviewDialogChange = (open: boolean) => {
     if (!open) setDocumentToPreview(null);
-    setPreviewDialogOpen(open);
+    setDocPreviewDialogOpen(open);
+  };
+
+  const openPasswordPreviewDialog = (cred: Credential) => {
+    setCredentialToPreview(cred);
+    setPasswordPreviewOpen(true);
+  };
+
+  const handlePasswordPreviewDialogChange = (open: boolean) => {
+    if (!open) setCredentialToPreview(null);
+    setPasswordPreviewOpen(open);
   };
 
   const openMemoryPreviewDialog = (memory: Memory) => {
@@ -916,13 +930,14 @@ export default function DashboardPage() {
               onEdit={openEditPasswordDialog}
               onDelete={setDeleteTargetId}
               onSend={openSendEmailDialog}
+              onPreview={openPasswordPreviewDialog}
               isTravelModeActive={isTravelModeActive}
             />
             <SecureDocumentList
               documents={filteredDocuments}
               onEdit={openEditDocumentDialog}
               onDelete={setDeleteDocumentTargetId}
-              onPreview={openPreviewDialog}
+              onPreview={openDocPreviewDialog}
             />
             <MemoryList
                 memories={filteredMemories}
@@ -939,6 +954,7 @@ export default function DashboardPage() {
             onEdit={openEditPasswordDialog}
             onDelete={setDeleteTargetId}
             onSend={openSendEmailDialog}
+            onPreview={openPasswordPreviewDialog}
             isTravelModeActive={isTravelModeActive}
           />
         );
@@ -948,7 +964,7 @@ export default function DashboardPage() {
             documents={filteredDocuments}
             onEdit={openEditDocumentDialog}
             onDelete={setDeleteDocumentTargetId}
-            onPreview={openPreviewDialog}
+            onPreview={openDocPreviewDialog}
           />
         );
       case 'Memories':
@@ -967,6 +983,7 @@ export default function DashboardPage() {
             onEdit={openEditPasswordDialog}
             onDelete={setDeleteTargetId}
             onSend={openSendEmailDialog}
+            onPreview={openPasswordPreviewDialog}
           />
         );
       case 'Shared Documents':
@@ -975,7 +992,7 @@ export default function DashboardPage() {
             documents={filteredDocuments}
             onEdit={openEditDocumentDialog}
             onDelete={setDeleteDocumentTargetId}
-            onPreview={openPreviewDialog}
+            onPreview={openDocPreviewDialog}
           />
         );
       case 'Shared Memories':
@@ -1051,12 +1068,13 @@ export default function DashboardPage() {
               onEdit={openEditPasswordDialog}
               onDelete={setDeleteTargetId}
               onSend={openSendEmailDialog}
+              onPreview={openPasswordPreviewDialog}
             />}
             {filteredCombinedDocuments.length > 0 && <SecureDocumentList
               documents={filteredCombinedDocuments}
               onEdit={openEditDocumentDialog}
               onDelete={setDeleteDocumentTargetId}
-              onPreview={openPreviewDialog}
+              onPreview={openDocPreviewDialog}
             />}
             {filteredCombinedMemories.length > 0 && <MemoryList
                 memories={filteredCombinedMemories}
@@ -1355,8 +1373,8 @@ export default function DashboardPage() {
       />
       
       <SecureDocumentPreviewDialog
-        open={isPreviewDialogOpen}
-        onOpenChange={handlePreviewDialogChange}
+        open={isDocPreviewDialogOpen}
+        onOpenChange={handleDocPreviewDialogChange}
         document={documentToPreview}
       />
 
@@ -1364,6 +1382,12 @@ export default function DashboardPage() {
         open={isMemoryPreviewOpen}
         onOpenChange={handleMemoryPreviewDialogChange}
         memory={memoryToPreview}
+      />
+
+      <PasswordPreviewDialog
+        open={isPasswordPreviewOpen}
+        onOpenChange={handlePasswordPreviewDialogChange}
+        credential={credentialToPreview}
       />
 
       <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>

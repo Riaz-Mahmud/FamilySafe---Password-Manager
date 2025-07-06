@@ -101,23 +101,26 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
             const isImage = doc.icon === 'ImageIcon';
             return (
                 <Card key={doc.id} className="w-full">
-                    <CardContent className="p-4 flex flex-col gap-4">
+                    <CardContent className="p-4 flex flex-col gap-4 group/doc-card">
                         <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-center gap-3 overflow-hidden">
+                            <div 
+                                className="flex items-center gap-3 overflow-hidden cursor-pointer"
+                                onClick={() => onPreview(doc)}
+                            >
                                 {isImage ? (
                                     <Image
                                         src={doc.fileDataUrl}
                                         alt={doc.name}
                                         width={40}
                                         height={40}
-                                        className="h-10 w-10 rounded-lg object-cover shrink-0"
+                                        className="h-10 w-10 rounded-lg object-cover shrink-0 transition-transform duration-300 group-hover/doc-card:scale-105"
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
                                         <IconComponent className="w-5 h-5 text-muted-foreground" />
                                     </div>
                                 )}
-                                <div className="flex flex-col overflow-hidden">
+                                <div className="flex flex-col overflow-hidden transition-colors group-hover/doc-card:text-primary">
                                     <p className="font-medium truncate">{doc.name}</p>
                                     <p className="text-sm text-muted-foreground">{formatFileSize(doc.fileSize)}</p>
                                     {renderOwnership(doc)}
@@ -183,7 +186,10 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
               const isImage = doc.icon === 'ImageIcon';
               return (
                 <TableRow key={doc.id}>
-                  <TableCell>
+                  <TableCell 
+                    className="cursor-pointer group/doc-row"
+                    onClick={() => onPreview(doc)}
+                  >
                     <div className="flex items-center gap-3">
                       {isImage ? (
                           <Image
@@ -191,14 +197,14 @@ export function SecureDocumentList({ documents, onEdit, onDelete, onPreview }: S
                               alt={doc.name}
                               width={40}
                               height={40}
-                              className="h-10 w-10 rounded-lg object-cover shrink-0"
+                              className="h-10 w-10 rounded-lg object-cover shrink-0 transition-transform duration-300 group-hover/doc-row:scale-105"
                           />
                       ) : (
                         <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-secondary shrink-0">
                           <IconComponent className="w-5 h-5 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="flex flex-col overflow-hidden">
+                      <div className="flex flex-col overflow-hidden transition-colors group-hover/doc-row:text-primary">
                         <span className="font-medium truncate">{doc.name}</span>
                         <span className="text-sm text-muted-foreground">{doc.fileType}</span>
                         {renderOwnership(doc)}
